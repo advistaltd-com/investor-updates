@@ -2,12 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
+/* GoAiMEX Investor Portal Design System
+   Inspired by fal.ai / Vercel / Linear
+   Dark-mode first, investor-grade aesthetic
+   All colors MUST be HSL.
 */
 
 @layer base {
   :root {
+    /* Light mode - rarely used, dark is default */
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
 
@@ -39,58 +42,62 @@ All colors MUST be HSL.
     --radius: 0.5rem;
 
     --sidebar-background: 0 0% 98%;
-
     --sidebar-foreground: 240 5.3% 26.1%;
-
     --sidebar-primary: 240 5.9% 10%;
-
     --sidebar-primary-foreground: 0 0% 98%;
-
     --sidebar-accent: 240 4.8% 95.9%;
-
     --sidebar-accent-foreground: 240 5.9% 10%;
-
     --sidebar-border: 220 13% 91%;
-
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    /* Deep charcoal background - not pure black */
+    --background: 220 16% 8%;
+    --foreground: 210 40% 96%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    /* Slightly lighter charcoal for cards/surfaces */
+    --card: 220 14% 11%;
+    --card-foreground: 210 40% 96%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 220 14% 11%;
+    --popover-foreground: 210 40% 96%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    /* Subtle dark blue accent */
+    --primary: 217 70% 55%;
+    --primary-foreground: 210 40% 98%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    /* Surface variations */
+    --secondary: 220 14% 14%;
+    --secondary-foreground: 210 40% 96%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 220 14% 14%;
+    --muted-foreground: 215 20% 55%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 217 60% 20%;
+    --accent-foreground: 210 40% 96%;
 
-    --destructive: 0 62.8% 30.6%;
+    --destructive: 0 62.8% 45%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    /* Subtle borders with soft glow potential */
+    --border: 220 14% 18%;
+    --input: 220 14% 16%;
+    --ring: 217 70% 55%;
+
+    --sidebar-background: 220 14% 10%;
+    --sidebar-foreground: 210 40% 96%;
+    --sidebar-primary: 217 70% 55%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: 220 14% 14%;
+    --sidebar-accent-foreground: 210 40% 96%;
+    --sidebar-border: 220 14% 18%;
+    --sidebar-ring: 217 70% 55%;
+
+    /* Timeline specific */
+    --timeline-line: 220 14% 25%;
+    --timeline-dot: 220 14% 20%;
+    --timeline-glow: 217 70% 55%;
   }
 }
 
@@ -99,7 +106,64 @@ All colors MUST be HSL.
     @apply border-border;
   }
 
+  html {
+    @apply dark;
+  }
+
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Typography refinements */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+  }
+
+  h1 {
+    @apply text-4xl md:text-5xl lg:text-6xl;
+  }
+
+  h2 {
+    @apply text-3xl md:text-4xl;
+  }
+
+  h3 {
+    @apply text-xl md:text-2xl;
+  }
+}
+
+@layer utilities {
+  /* Subtle glow effects */
+  .glow-primary {
+    box-shadow: 0 0 20px -5px hsl(var(--primary) / 0.4);
+  }
+
+  .glow-subtle {
+    box-shadow: 0 0 40px -10px hsl(var(--primary) / 0.2);
+  }
+
+  /* Noise texture overlay - very subtle */
+  .noise-overlay {
+    position: relative;
+  }
+
+  .noise-overlay::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    opacity: 0.02;
+    pointer-events: none;
+  }
+
+  /* Card hover effect */
+  .card-hover {
+    @apply transition-all duration-300;
+  }
+
+  .card-hover:hover {
+    @apply glow-subtle;
+    transform: translateY(-2px);
   }
 }
