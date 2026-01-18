@@ -1,5 +1,6 @@
 import React from "react";
 import { Timeline, TimelineEntry } from "@/components/ui/timeline";
+import { Header } from "@/components/layout/Header";
 
 const timelineData: TimelineEntry[] = [
   {
@@ -123,14 +124,17 @@ const timelineData: TimelineEntry[] = [
   },
 ];
 
-const Investor = () => {
+const Investor: React.FC = () => {
   return (
     <div className="min-h-screen w-full bg-background">
-      <Timeline 
-        data={timelineData} 
-        heading="GoAiMEX Investor Updates"
-        subheading="Track our journey, milestones, and key developments"
-      />
+      <Header />
+      <div className="pt-16">
+        <Timeline 
+          data={timelineData} 
+          heading="GoAiMEX Investor Updates"
+          subheading="Track our journey, milestones, and key developments"
+        />
+      </div>
     </div>
   );
 };
