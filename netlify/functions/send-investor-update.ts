@@ -111,9 +111,14 @@ export const handler: Handler = async (event) => {
               <p>
                 <a href="${updateUrl}" style="color: #2563eb; text-decoration: none;">View full update</a>
               </p>
-              <p style="font-size: 12px; color: #94a3b8;">
-                <a href="${unsubscribeUrl}" style="color: #94a3b8;">Unsubscribe</a>
-              </p>
+              <div style="margin-top: 16px;">
+                <a
+                  href="${unsubscribeUrl}"
+                  style="display: inline-block; padding: 10px 16px; border-radius: 6px; background: #e2e8f0; color: #0f172a; text-decoration: none; font-size: 12px;"
+                >
+                  Unsubscribe
+                </a>
+              </div>
             </div>
           `,
           text: `${title}\n\n${excerpt}\n\nView full update: ${updateUrl}\nUnsubscribe: ${unsubscribeUrl}`,
