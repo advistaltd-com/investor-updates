@@ -58,7 +58,7 @@ const Auth: React.FC = () => {
       {/* Footer */}
       <div className="fixed bottom-4 text-center">
         <p className="text-muted-foreground text-xs">
-          © 2024 GoAiMEX. All rights reserved.
+          © 2026 GoAiMEX. All rights reserved.
         </p>
       </div>
     </div>
