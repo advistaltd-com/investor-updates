@@ -58,7 +58,18 @@ Functions run in `netlify/functions` and use Firebase Admin SDK:
 
 Required Netlify env vars (set in Netlify dashboard → Site settings → Environment variables):
 
-- `FIREBASE_SERVICE_ACCOUNT` - Firebase service account JSON (can be base64 encoded)
+**Firebase Service Account (choose one method):**
+
+**Method 1: Individual variables (recommended - more reliable)**
+- `FIREBASE_PROJECT_ID` - Your Firebase project ID
+- `FIREBASE_CLIENT_EMAIL` - Service account email (from service account JSON)
+- `FIREBASE_PRIVATE_KEY` - Private key from service account (keep `\n` as literal, Netlify will handle it)
+- Optional: `FIREBASE_PRIVATE_KEY_ID`, `FIREBASE_CLIENT_ID`, `FIREBASE_CLIENT_X509_CERT_URL`
+
+**Method 2: JSON string (fallback)**
+- `FIREBASE_SERVICE_ACCOUNT` - Complete service account JSON as string or base64 encoded
+
+**Other required variables:**
 - `RESEND_API_KEY` - Used as SMTP password (username is `resend`)
 - `RESEND_FROM` - Email address to send from (must be verified domain)
 - `UNSUBSCRIBE_SECRET` - Secret for signing unsubscribe tokens
@@ -68,6 +79,15 @@ Optional Netlify env vars:
 - `RESEND_SMTP_PORT` - SMTP port (default: `587`). Options: `25`, `465`, `587`, `2465`, `2587`
 
 **Security Note**: Never commit real secret values to the repository. The `.env.example` file contains only placeholders. Set actual values in Netlify's environment variables dashboard.
+
+**Getting Firebase Service Account Credentials:**
+1. Go to Firebase Console → Project Settings → Service Accounts
+2. Click "Generate new private key"
+3. Download the JSON file
+4. Extract these values:
+   - `project_id` → `FIREBASE_PROJECT_ID`
+   - `client_email` → `FIREBASE_CLIENT_EMAIL`
+   - `private_key` → `FIREBASE_PRIVATE_KEY` (copy the entire key including `-----BEGIN PRIVATE KEY-----` and `-----END PRIVATE KEY-----`)
 
 ## Access request form
 
