@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Header } from "@/components/layout/Header";
+import { useSEO } from "@/hooks/use-seo";
 
 interface UpdateDoc {
   id: string;
@@ -18,6 +19,12 @@ interface UpdateDoc {
 }
 
 const Admin: React.FC = () => {
+  useSEO({
+    title: "Admin Dashboard | GoAiMEX Investor Portal",
+    description: "Admin dashboard for managing and publishing investor updates.",
+    noindex: true,
+  });
+
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [isSending, setIsSending] = useState(false);

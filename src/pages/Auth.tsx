@@ -7,8 +7,15 @@ import { EmailLinkStep } from "@/components/auth/EmailLinkStep";
 import { SetPasswordStep } from "@/components/auth/SetPasswordStep";
 import { PasswordStep } from "@/components/auth/PasswordStep";
 import { NotApprovedStep } from "@/components/auth/NotApprovedStep";
+import { useSEO } from "@/hooks/use-seo";
 
 const Auth: React.FC = () => {
+  useSEO({
+    title: "Sign In | GoAiMEX Investor Portal",
+    description: "Sign in to access your GoAiMEX investor portal account.",
+    noindex: true,
+  });
+
   const { authStep, completeEmailLinkSignIn } = useAuth();
   const navigate = useNavigate();
 

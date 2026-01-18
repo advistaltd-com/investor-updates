@@ -1,7 +1,14 @@
 import { useLocation } from "react-router-dom";
 import { useEffect } from "react";
+import { useSEO } from "@/hooks/use-seo";
 
 const NotFound = () => {
+  useSEO({
+    title: "404 - Page Not Found | GoAiMEX Investor Portal",
+    description: "The page you are looking for does not exist.",
+    noindex: true,
+  });
+
   const location = useLocation();
 
   useEffect(() => {

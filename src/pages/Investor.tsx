@@ -6,6 +6,7 @@ import { format } from "date-fns";
 import { Timeline, TimelineEntry } from "@/components/ui/timeline";
 import { Header } from "@/components/layout/Header";
 import { db } from "@/lib/firebase";
+import { useSEO } from "@/hooks/use-seo";
 
 interface TimelineDoc {
   id: string;
@@ -15,6 +16,12 @@ interface TimelineDoc {
 }
 
 const Investor: React.FC = () => {
+  useSEO({
+    title: "Investor Updates | GoAiMEX Investor Portal",
+    description: "View the latest investor updates, milestones, and key developments from GoAiMEX.",
+    noindex: true,
+  });
+
   const [updates, setUpdates] = useState<TimelineDoc[]>([]);
   const [error, setError] = useState<string | null>(null);
 
