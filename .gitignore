@@ -25,4 +25,10 @@ dist-ssr
 
 # Environment variables
 .env
+.env.local
 .env.*.local
+.env.development
+.env.production
+.env.test
+# Keep .env.example in repo (with placeholders only, no real secrets)
+!.env.example

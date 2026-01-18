@@ -20,6 +20,9 @@ Private, authenticated investor portal powered by Firebase Auth + Firestore and 
 1. Install dependencies
    - `npm install`
 2. Create `.env` based on `.env.example`
+   - Copy `.env.example` to `.env`
+   - Replace all `REPLACE_WITH_*` placeholders with your actual values
+   - **Important**: Never commit `.env` files with real secrets to the repository
 3. Run locally
    - For frontend only: `npm run dev`
    - For full stack (with Netlify functions): `netlify dev`
@@ -53,9 +56,9 @@ Functions run in `netlify/functions` and use Firebase Admin SDK:
 - `send-investor-update`: creates update + sends emails via Resend SMTP.
 - `unsubscribe`: updates `subscribed=false` with signed token.
 
-Required Netlify env vars:
+Required Netlify env vars (set in Netlify dashboard → Site settings → Environment variables):
 
-- `FIREBASE_SERVICE_ACCOUNT`
+- `FIREBASE_SERVICE_ACCOUNT` - Firebase service account JSON (can be base64 encoded)
 - `RESEND_API_KEY` - Used as SMTP password (username is `resend`)
 - `RESEND_FROM` - Email address to send from (must be verified domain)
 - `UNSUBSCRIBE_SECRET` - Secret for signing unsubscribe tokens
@@ -63,6 +66,8 @@ Required Netlify env vars:
 Optional Netlify env vars:
 
 - `RESEND_SMTP_PORT` - SMTP port (default: `587`). Options: `25`, `465`, `587`, `2465`, `2587`
+
+**Security Note**: Never commit real secret values to the repository. The `.env.example` file contains only placeholders. Set actual values in Netlify's environment variables dashboard.
 
 ## Access request form
 
