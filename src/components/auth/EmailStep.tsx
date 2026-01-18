@@ -17,6 +17,7 @@ export const EmailStep: React.FC = () => {
     setError,
     setIsLoading,
     isLoading,
+    error,
   } = useAuth();
   const [inputEmail, setInputEmail] = useState("");
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -50,7 +51,13 @@ export const EmailStep: React.FC = () => {
         setAuthStep("password");
       }
     } catch (err) {
-      setError("Something went wrong. Please try again.");
+      const errorMessage = err instanceof Error ? err.message : "Something went wrong. Please try again.";
+      // Check if it's a network error (function not available in dev)
+      if (errorMessage.includes("fetch") || errorMessage.includes("Failed to fetch") || errorMessage.includes("NetworkError")) {
+        setError("Unable to connect to server. Make sure Netlify Dev is running (netlify dev) or check your network connection.");
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -85,6 +92,9 @@ export const EmailStep: React.FC = () => {
           />
           {validationError && (
             <p className="text-destructive text-sm">{validationError}</p>
+          )}
+          {error && !validationError && (
+            <p className="text-destructive text-sm">{error}</p>
           )}
         </div>
 

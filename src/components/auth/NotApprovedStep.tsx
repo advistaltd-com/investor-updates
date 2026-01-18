@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,11 @@ import { RequestAccessModal } from "./RequestAccessModal";
 export const NotApprovedStep: React.FC = () => {
   const { email, setAuthStep } = useAuth();
   const [showRequestModal, setShowRequestModal] = useState(false);
+
+  // Automatically open the modal when this step is shown
+  useEffect(() => {
+    setShowRequestModal(true);
+  }, []);
 
   return (
     <>

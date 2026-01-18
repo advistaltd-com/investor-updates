@@ -9,7 +9,8 @@ import {
   signOut,
   type User as FirebaseUser,
 } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
 import { getFunctionUrl } from "@/lib/functions";
 
 export type AuthStep =
@@ -79,8 +80,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } else {
           setAuthStep("set-password");
         }
-        const tokenResult = await currentUser.getIdTokenResult();
-        setIsAdmin(Boolean(tokenResult.claims.admin));
+        
+        // Check Firestore for admin status
+        const email = currentUser.email?.toLowerCase();
+        if (email) {
+          try {
+            const adminDoc = await getDoc(doc(db, "admins", email));
+            setIsAdmin(adminDoc.exists());
+          } catch (err) {
+            console.error("Error checking admin status:", err);
+            setIsAdmin(false);
+          }
+        } else {
+          setIsAdmin(false);
+        }
       } else {
         setFirebaseUser(null);
         setUser(null);
@@ -96,17 +109,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const checkEmailApproval = useCallback(
     async (emailToCheck: string): Promise<{ approved: boolean; isExistingUser: boolean }> => {
-      const response = await fetch(getFunctionUrl("check-allowlist"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: emailToCheck.toLowerCase().trim() }),
-      });
+      try {
+        const response = await fetch(getFunctionUrl("check-allowlist"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: emailToCheck.toLowerCase().trim() }),
+        });
 
-      if (!response.ok) {
-        throw new Error("Unable to verify access. Please try again.");
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || "Unable to verify access. Please try again.");
+        }
+
+        return response.json();
+      } catch (err) {
+        // Re-throw with more context for network errors
+        if (err instanceof TypeError && err.message.includes("fetch")) {
+          throw new Error("Network error: Unable to connect to server. Make sure Netlify Dev is running (netlify dev).");
+        }
+        throw err;
       }
-
-      return response.json();
     },
   );
 
