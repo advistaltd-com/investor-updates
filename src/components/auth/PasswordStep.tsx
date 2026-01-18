@@ -6,9 +6,12 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 
 export const PasswordStep: React.FC = () => {
-  const { email, setAuthStep, login, setError, error, isLoading, setIsLoading } = useAuth();
+  const { email, setAuthStep, login, setError, error, isLoading, setIsLoading, sendPasswordReset } = useAuth();
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [resetMessage, setResetMessage] = useState<string | null>(null);
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [isResetting, setIsResetting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,6 +27,24 @@ export const PasswordStep: React.FC = () => {
       setError("Invalid email or password. Please try again.");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handlePasswordReset = async () => {
+    if (!email) return;
+    setResetMessage(null);
+    setResetError(null);
+    setIsResetting(true);
+
+    try {
+      const success = await sendPasswordReset(email);
+      if (success) {
+        setResetMessage("Password reset email sent. Check your inbox.");
+      }
+    } catch (err) {
+      setResetError("Unable to send reset email. Please try again.");
+    } finally {
+      setIsResetting(false);
     }
   };
 
@@ -89,6 +110,22 @@ export const PasswordStep: React.FC = () => {
             "Sign In"
           )}
         </Button>
+
+        <button
+          type="button"
+          onClick={handlePasswordReset}
+          disabled={isResetting}
+          className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          {isResetting ? "Sending reset email..." : "Forgot your password?"}
+        </button>
+
+        {resetMessage && (
+          <p className="text-green-600 text-sm text-center">{resetMessage}</p>
+        )}
+        {resetError && (
+          <p className="text-destructive text-sm text-center">{resetError}</p>
+        )}
 
       </form>
     </motion.div>

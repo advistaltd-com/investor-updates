@@ -6,6 +6,7 @@ import {
   signInWithEmailLink,
   onAuthStateChanged,
   updatePassword,
+  sendPasswordResetEmail,
   signOut,
   type User as FirebaseUser,
 } from "firebase/auth";
@@ -43,6 +44,7 @@ interface AuthContextType {
   sendEmailLink: (email: string) => Promise<boolean>;
   completeEmailLinkSignIn: () => Promise<{ handled: boolean; isNewUser: boolean }>;
   setPassword: (password: string) => Promise<boolean>;
+  sendPasswordReset: (email: string) => Promise<boolean>;
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
 }
@@ -208,6 +210,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return true;
   }, []);
 
+  const sendPasswordReset = useCallback(async (emailToReset: string): Promise<boolean> => {
+    const trimmedEmail = emailToReset.trim().toLowerCase();
+    if (!trimmedEmail) {
+      setError("Please enter a valid email to reset your password.");
+      return false;
+    }
+
+    const actionCodeSettings = {
+      url: getEmailLinkRedirect(),
+      handleCodeInApp: false,
+    };
+
+    await sendPasswordResetEmail(auth, trimmedEmail, actionCodeSettings);
+    return true;
+  }, []);
+
   const login = useCallback(async (emailToLogin: string, password: string): Promise<boolean> => {
     await signInWithEmailAndPassword(auth, emailToLogin, password);
     await syncUserRecord();
@@ -241,6 +259,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       sendEmailLink,
       completeEmailLinkSignIn,
       setPassword,
+      sendPasswordReset,
       login,
       logout,
     }),
@@ -257,6 +276,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       sendEmailLink,
       completeEmailLinkSignIn,
       setPassword,
+      sendPasswordReset,
       login,
       logout,
     ],

@@ -42,9 +42,17 @@ Private, authenticated investor portal powered by Firebase Auth + Firestore and 
 5. Create a service account and set:
    - `FIREBASE_SERVICE_ACCOUNT` in Netlify env vars (JSON or base64).
 6. Set an admin user:
-   - Create a document in the `admins` collection with the admin's email as the document ID (lowercase).
-   - Example: Collection `admins`, Document ID: `admin@example.com`
-   - Document data: `{ email: "admin@example.com" }` (optional fields)
+   - **Easy way (recommended)**: Run the seed script:
+     ```bash
+     npm run seed
+     ```
+     This will add `mdil@goaimex.com` to both `approved_emails` and `admins` collections.
+     To use a different email: `ADMIN_EMAIL=your@email.com npm run seed`
+   
+   - **Manual way**: Create a document in the `admins` collection with the admin's email as the document ID (lowercase).
+     - Example: Collection `admins`, Document ID: `admin@example.com`
+     - Document data: `{ email: "admin@example.com" }` (optional fields)
+     - Also add the email to `approved_emails` collection
    - The user must sign in once to create their account before they can access admin features.
 
 ## Netlify functions
@@ -88,6 +96,38 @@ Optional Netlify env vars:
    - `project_id` → `FIREBASE_PROJECT_ID`
    - `client_email` → `FIREBASE_CLIENT_EMAIL`
    - `private_key` → `FIREBASE_PRIVATE_KEY` (copy the entire key including `-----BEGIN PRIVATE KEY-----` and `-----END PRIVATE KEY-----`)
+
+## Seeding the database
+
+To quickly set up the initial admin user, use the seed script:
+
+```bash
+npm run seed
+```
+
+This will:
+- Add the email in `ADMIN_EMAIL` to the `approved_emails` collection
+- Add the email in `ADMIN_EMAIL` to the `admins` collection
+
+Set the admin email (required):
+```bash
+ADMIN_EMAIL=your@email.com npm run seed
+```
+
+**Requirements:**
+- Your `.env` file must have Firebase credentials configured (see Firebase setup above)
+- The script uses Firebase Admin SDK, so you need either:
+  - Individual env vars: `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`
+  - Or a `service-account.json` file in the project root
+
+**Alternative: Netlify Function**
+You can also call the seed function after deployment:
+```bash
+curl -X POST https://your-site.netlify.app/.netlify/functions/seed-db \
+  -H "x-seed-secret: your-secret-key"
+```
+
+Set `SEED_SECRET` and `SEED_ADMIN_EMAIL` in Netlify environment variables for security.
 
 ## Access request form
 
