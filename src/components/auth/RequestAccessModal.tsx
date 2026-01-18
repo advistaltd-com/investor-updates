@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Loader2, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -35,6 +35,11 @@ export const RequestAccessModal: React.FC<RequestAccessModalProps> = ({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setFormData((prev) => ({ ...prev, email: prefillEmail }));
+  }, [prefillEmail]);
 
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -43,8 +48,11 @@ export const RequestAccessModal: React.FC<RequestAccessModalProps> = ({
     }
   };
 
+  const encode = (data: Record<string, string>) => new URLSearchParams(data).toString();
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitError(null);
     
     const result = requestSchema.safeParse(formData);
     if (!result.success) {
@@ -59,13 +67,26 @@ export const RequestAccessModal: React.FC<RequestAccessModalProps> = ({
     }
 
     setIsSubmitting(true);
-    
-    // Simulate form submission (will be Netlify Form in production)
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    console.log("[Mock] Access request submitted:", formData);
-    setIsSubmitting(false);
-    setIsSubmitted(true);
+
+    try {
+      await fetch("/", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: encode({
+          "form-name": "request-access",
+          name: formData.name,
+          firm: formData.firm,
+          email: formData.email,
+          linkedin: formData.linkedin,
+          note: formData.note,
+        }),
+      });
+      setIsSubmitted(true);
+    } catch (err) {
+      setSubmitError("Failed to submit. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleClose = () => {
@@ -136,12 +157,26 @@ export const RequestAccessModal: React.FC<RequestAccessModalProps> = ({
                   </Button>
                 </motion.div>
               ) : (
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form
+                  name="request-access"
+                  method="POST"
+                  data-netlify="true"
+                  data-netlify-honeypot="bot-field"
+                  onSubmit={handleSubmit}
+                  className="space-y-4"
+                >
+                  <input type="hidden" name="form-name" value="request-access" />
+                  <div className="hidden">
+                    <label>
+                      Don't fill this out if you're human: <input name="bot-field" />
+                    </label>
+                  </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-foreground">
                       Full Name *
                     </label>
                     <Input
+                      name="name"
                       placeholder="John Smith"
                       value={formData.name}
                       onChange={(e) => handleChange("name", e.target.value)}
@@ -158,6 +193,7 @@ export const RequestAccessModal: React.FC<RequestAccessModalProps> = ({
                       Firm / Company *
                     </label>
                     <Input
+                      name="firm"
                       placeholder="Acme Ventures"
                       value={formData.firm}
                       onChange={(e) => handleChange("firm", e.target.value)}
@@ -175,6 +211,7 @@ export const RequestAccessModal: React.FC<RequestAccessModalProps> = ({
                     </label>
                     <Input
                       type="email"
+                      name="email"
                       placeholder="john@acmeventures.com"
                       value={formData.email}
                       onChange={(e) => handleChange("email", e.target.value)}
@@ -191,6 +228,7 @@ export const RequestAccessModal: React.FC<RequestAccessModalProps> = ({
                       LinkedIn / Website
                     </label>
                     <Input
+                      name="linkedin"
                       placeholder="https://linkedin.com/in/johnsmith"
                       value={formData.linkedin}
                       onChange={(e) => handleChange("linkedin", e.target.value)}
@@ -207,6 +245,7 @@ export const RequestAccessModal: React.FC<RequestAccessModalProps> = ({
                       Note (optional)
                     </label>
                     <Textarea
+                      name="note"
                       placeholder="Tell us about your interest in GoAiMEX..."
                       value={formData.note}
                       onChange={(e) => handleChange("note", e.target.value)}
@@ -230,6 +269,9 @@ export const RequestAccessModal: React.FC<RequestAccessModalProps> = ({
                       "Submit Request"
                     )}
                   </Button>
+                  {submitError && (
+                    <p className="text-destructive text-xs text-center">{submitError}</p>
+                  )}
                 </form>
               )}
             </div>

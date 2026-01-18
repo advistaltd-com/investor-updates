@@ -1,126 +1,246 @@
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
+import {
+  isSignInWithEmailLink,
+  sendSignInLinkToEmail,
+  signInWithEmailAndPassword,
+  signInWithEmailLink,
+  onAuthStateChanged,
+  updatePassword,
+  signOut,
+  type User as FirebaseUser,
+} from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import { getFunctionUrl } from "@/lib/functions";
 
-export type AuthStep = 
-  | "email" 
-  | "otp" 
-  | "set-password" 
-  | "password" 
-  | "not-approved" 
+export type AuthStep =
+  | "email"
+  | "email-link"
+  | "set-password"
+  | "password"
+  | "not-approved"
   | "authenticated";
 
 export interface User {
   email: string;
-  isNewUser: boolean;
+  uid: string;
 }
 
 interface AuthContextType {
   user: User | null;
+  firebaseUser: FirebaseUser | null;
+  isAdmin: boolean;
   authStep: AuthStep;
   email: string;
   isLoading: boolean;
+  isReady: boolean;
   error: string | null;
   setEmail: (email: string) => void;
   setAuthStep: (step: AuthStep) => void;
   setError: (error: string | null) => void;
   setIsLoading: (loading: boolean) => void;
-  checkEmailApproval: (email: string) => Promise<{ approved: boolean; isNewUser: boolean }>;
-  sendOtp: (email: string) => Promise<boolean>;
-  verifyOtp: (email: string, otp: string) => Promise<boolean>;
-  setPassword: (email: string, password: string) => Promise<boolean>;
+  checkEmailApproval: (email: string) => Promise<{ approved: boolean; isExistingUser: boolean }>;
+  sendEmailLink: (email: string) => Promise<boolean>;
+  completeEmailLinkSignIn: () => Promise<{ handled: boolean; isNewUser: boolean }>;
+  setPassword: (password: string) => Promise<boolean>;
   login: (email: string, password: string) => Promise<boolean>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock data - will be replaced with Firebase/Netlify Functions
-const MOCK_APPROVED_DOMAINS = ["goaimex.com", "investor.vc", "capitalfirm.com"];
-const MOCK_APPROVED_EMAILS = ["demo@example.com", "investor@test.com"];
-const MOCK_EXISTING_USERS = ["demo@example.com"]; // Users who already have accounts
+const STORAGE_KEY = "emailForSignIn";
+
+const getEmailLinkRedirect = () =>
+  import.meta.env.VITE_EMAIL_LINK_REDIRECT_URL || `${window.location.origin}/auth`;
+
+const parseErrorMessage = (error: unknown) => {
+  if (error instanceof Error) return error.message;
+  return "Something went wrong. Please try again.";
+};
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [authStep, setAuthStep] = useState<AuthStep>("email");
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [needsPasswordSetup, setNeedsPasswordSetup] = useState(false);
 
-  const checkEmailApproval = useCallback(async (emailToCheck: string): Promise<{ approved: boolean; isNewUser: boolean }> => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    const normalizedEmail = emailToCheck.toLowerCase().trim();
-    const domain = normalizedEmail.split("@")[1];
-    
-    const isApproved = MOCK_APPROVED_EMAILS.includes(normalizedEmail) || 
-                       MOCK_APPROVED_DOMAINS.includes(domain);
-    const isNewUser = !MOCK_EXISTING_USERS.includes(normalizedEmail);
-    
-    return { approved: isApproved, isNewUser };
-  }, []);
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser) {
+        setFirebaseUser(currentUser);
+        setUser({ email: currentUser.email || "", uid: currentUser.uid });
+        if (!needsPasswordSetup) {
+          setAuthStep("authenticated");
+        } else {
+          setAuthStep("set-password");
+        }
+        const tokenResult = await currentUser.getIdTokenResult();
+        setIsAdmin(Boolean(tokenResult.claims.admin));
+      } else {
+        setFirebaseUser(null);
+        setUser(null);
+        setIsAdmin(false);
+        setAuthStep("email");
+        setNeedsPasswordSetup(false);
+      }
+      setIsReady(true);
+    });
 
-  const sendOtp = useCallback(async (emailToSend: string): Promise<boolean> => {
-    // Simulate sending OTP via Resend
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    console.log(`[Mock] OTP sent to ${emailToSend}`);
+    return () => unsubscribe();
+  }, [needsPasswordSetup]);
+
+  const checkEmailApproval = useCallback(
+    async (emailToCheck: string): Promise<{ approved: boolean; isExistingUser: boolean }> => {
+      const response = await fetch(getFunctionUrl("check-allowlist"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: emailToCheck.toLowerCase().trim() }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Unable to verify access. Please try again.");
+      }
+
+      return response.json();
+    },
+  );
+
+  const sendEmailLink = useCallback(async (emailToSend: string): Promise<boolean> => {
+    const actionCodeSettings = {
+      url: getEmailLinkRedirect(),
+      handleCodeInApp: true,
+    };
+
+    await sendSignInLinkToEmail(auth, emailToSend, actionCodeSettings);
+    window.localStorage.setItem(STORAGE_KEY, emailToSend);
     return true;
   }, []);
 
-  const verifyOtp = useCallback(async (_email: string, otp: string): Promise<boolean> => {
-    // Simulate OTP verification - accept "123456" for demo
-    await new Promise(resolve => setTimeout(resolve, 800));
-    return otp === "123456";
+  const syncUserRecord = useCallback(async () => {
+    if (!auth.currentUser) return;
+
+    const token = await auth.currentUser.getIdToken();
+    const response = await fetch(getFunctionUrl("create-user"), {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error("Unable to sync user profile.");
+    }
   }, []);
 
-  const setPassword = useCallback(async (emailToSet: string, _password: string): Promise<boolean> => {
-    // Simulate creating user account
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setUser({ email: emailToSet, isNewUser: true });
+  const completeEmailLinkSignIn = useCallback(async () => {
+    if (typeof window === "undefined") {
+      return { handled: false, isNewUser: false };
+    }
+
+    if (!isSignInWithEmailLink(auth, window.location.href)) {
+      return { handled: false, isNewUser: false };
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const storedEmail = window.localStorage.getItem(STORAGE_KEY);
+      if (!storedEmail) {
+        throw new Error("We could not verify your sign-in email. Please restart.");
+      }
+
+      const result = await signInWithEmailLink(auth, storedEmail, window.location.href);
+      window.localStorage.removeItem(STORAGE_KEY);
+      setEmail(storedEmail);
+
+      await syncUserRecord();
+
+      const isNewUser = Boolean(result.additionalUserInfo?.isNewUser);
+      setNeedsPasswordSetup(isNewUser);
+      setAuthStep(isNewUser ? "set-password" : "authenticated");
+      return { handled: true, isNewUser };
+    } catch (err) {
+      setError(parseErrorMessage(err));
+      setAuthStep("email");
+      return { handled: true, isNewUser: false };
+    } finally {
+      setIsLoading(false);
+    }
+  }, [syncUserRecord]);
+
+  const setPassword = useCallback(async (password: string): Promise<boolean> => {
+    if (!auth.currentUser) {
+      setError("No active session found. Please sign in again.");
+      return false;
+    }
+
+    await updatePassword(auth.currentUser, password);
+    setNeedsPasswordSetup(false);
     setAuthStep("authenticated");
     return true;
   }, []);
 
   const login = useCallback(async (emailToLogin: string, password: string): Promise<boolean> => {
-    // Simulate login - accept "password123" for demo
-    await new Promise(resolve => setTimeout(resolve, 800));
-    if (password === "password123") {
-      setUser({ email: emailToLogin, isNewUser: false });
-      setAuthStep("authenticated");
-      return true;
-    }
-    return false;
-  }, []);
+    await signInWithEmailAndPassword(auth, emailToLogin, password);
+    await syncUserRecord();
+    setAuthStep("authenticated");
+    return true;
+  }, [syncUserRecord]);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    await signOut(auth);
     setUser(null);
     setAuthStep("email");
     setEmail("");
     setError(null);
   }, []);
 
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        authStep,
-        email,
-        isLoading,
-        error,
-        setEmail,
-        setAuthStep,
-        setError,
-        setIsLoading,
-        checkEmailApproval,
-        sendOtp,
-        verifyOtp,
-        setPassword,
-        login,
-        logout,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo(
+    () => ({
+      user,
+      firebaseUser,
+      isAdmin,
+      authStep,
+      email,
+      isLoading,
+      isReady,
+      error,
+      setEmail,
+      setAuthStep,
+      setError,
+      setIsLoading,
+      checkEmailApproval,
+      sendEmailLink,
+      completeEmailLinkSignIn,
+      setPassword,
+      login,
+      logout,
+    }),
+    [
+      user,
+      firebaseUser,
+      isAdmin,
+      authStep,
+      email,
+      isLoading,
+      isReady,
+      error,
+      checkEmailApproval,
+      sendEmailLink,
+      completeEmailLinkSignIn,
+      setPassword,
+      login,
+      logout,
+    ],
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = () => {

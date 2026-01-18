@@ -3,13 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { EmailStep } from "@/components/auth/EmailStep";
-import { OtpStep } from "@/components/auth/OtpStep";
+import { EmailLinkStep } from "@/components/auth/EmailLinkStep";
 import { SetPasswordStep } from "@/components/auth/SetPasswordStep";
 import { PasswordStep } from "@/components/auth/PasswordStep";
 import { NotApprovedStep } from "@/components/auth/NotApprovedStep";
 
 const Auth: React.FC = () => {
-  const { authStep } = useAuth();
+  const { authStep, completeEmailLinkSignIn } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -18,12 +18,16 @@ const Auth: React.FC = () => {
     }
   }, [authStep, navigate]);
 
+  useEffect(() => {
+    completeEmailLinkSignIn();
+  }, [completeEmailLinkSignIn]);
+
   const renderStep = () => {
     switch (authStep) {
       case "email":
         return <EmailStep />;
-      case "otp":
-        return <OtpStep />;
+      case "email-link":
+        return <EmailLinkStep />;
       case "set-password":
         return <SetPasswordStep />;
       case "password":

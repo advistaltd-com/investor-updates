@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 
 export const SetPasswordStep: React.FC = () => {
-  const { email, setAuthStep, setPassword, setError, error, isLoading, setIsLoading } = useAuth();
+  const { setAuthStep, setPassword, setError, error, isLoading, setIsLoading } = useAuth();
   const [password, setPasswordValue] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -30,7 +30,7 @@ export const SetPasswordStep: React.FC = () => {
     setError(null);
 
     try {
-      const success = await setPassword(email, password);
+      const success = await setPassword(password);
       if (!success) {
         setError("Failed to create account. Please try again.");
       }
@@ -49,7 +49,7 @@ export const SetPasswordStep: React.FC = () => {
       className="w-full max-w-sm"
     >
       <button
-        onClick={() => setAuthStep("otp")}
+        onClick={() => setAuthStep("email-link")}
         className="flex items-center text-muted-foreground hover:text-foreground transition-colors mb-6"
       >
         <ArrowLeft className="w-4 h-4 mr-2" />

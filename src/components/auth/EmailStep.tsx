@@ -9,7 +9,15 @@ import { z } from "zod";
 const emailSchema = z.string().email("Please enter a valid email address").trim().toLowerCase();
 
 export const EmailStep: React.FC = () => {
-  const { setEmail, setAuthStep, checkEmailApproval, sendOtp, setError, setIsLoading, isLoading } = useAuth();
+  const {
+    setEmail,
+    setAuthStep,
+    checkEmailApproval,
+    sendEmailLink,
+    setError,
+    setIsLoading,
+    isLoading,
+  } = useAuth();
   const [inputEmail, setInputEmail] = useState("");
   const [validationError, setValidationError] = useState<string | null>(null);
 
@@ -30,14 +38,13 @@ export const EmailStep: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const { approved, isNewUser } = await checkEmailApproval(normalizedEmail);
+      const { approved, isExistingUser } = await checkEmailApproval(normalizedEmail);
 
       if (!approved) {
         setAuthStep("not-approved");
-      } else if (isNewUser) {
-        // Send OTP for new users
-        await sendOtp(normalizedEmail);
-        setAuthStep("otp");
+      } else if (!isExistingUser) {
+        await sendEmailLink(normalizedEmail);
+        setAuthStep("email-link");
       } else {
         // Returning user - show password
         setAuthStep("password");

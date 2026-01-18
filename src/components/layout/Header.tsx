@@ -1,4 +1,5 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import { LogOut, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
@@ -11,7 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export const Header: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, isAdmin } = useAuth();
 
   if (!user) return null;
 
@@ -29,12 +30,23 @@ export const Header: React.FC = () => {
           </div>
 
           {/* Right side */}
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
-              <Bell className="w-5 h-5" />
-            </Button>
+          <div className="flex items-center gap-6">
+            <nav className="hidden md:flex items-center gap-4 text-sm text-muted-foreground">
+              <Link to="/investor" className="hover:text-foreground transition-colors">
+                Updates
+              </Link>
+              {isAdmin && (
+                <Link to="/admin" className="hover:text-foreground transition-colors">
+                  Admin
+                </Link>
+              )}
+            </nav>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
+                <Bell className="w-5 h-5" />
+              </Button>
 
-            <DropdownMenu>
+              <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="gap-2 text-muted-foreground hover:text-foreground">
                   <div className="w-8 h-8 bg-secondary rounded-full flex items-center justify-center">
@@ -59,7 +71,8 @@ export const Header: React.FC = () => {
                   Sign out
                 </DropdownMenuItem>
               </DropdownMenuContent>
-            </DropdownMenu>
+              </DropdownMenu>
+            </div>
           </div>
         </div>
       </div>

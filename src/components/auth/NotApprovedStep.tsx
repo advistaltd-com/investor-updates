@@ -33,7 +33,7 @@ export const NotApprovedStep: React.FC = () => {
             Access Restricted
           </h1>
           <p className="text-muted-foreground text-sm">
-            This portal is limited to existing investors.
+            This page is limited to existing investors.
           </p>
         </div>
 

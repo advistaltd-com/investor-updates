@@ -166,4 +166,13 @@
     @apply glow-subtle;
     transform: translateY(-2px);
   }
+
+  .prose-invert :where(a) {
+    color: hsl(var(--primary));
+  }
+
+  .prose-invert :where(img) {
+    border-radius: 0.75rem;
+    border: 1px solid hsl(var(--border));
+  }
 }

@@ -19,12 +19,9 @@ export const PasswordStep: React.FC = () => {
     setError(null);
 
     try {
-      const success = await login(email, password);
-      if (!success) {
-        setError("Invalid password. Please try again.");
-      }
+      await login(email, password);
     } catch (err) {
-      setError("Something went wrong. Please try again.");
+      setError("Invalid email or password. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -93,9 +90,6 @@ export const PasswordStep: React.FC = () => {
           )}
         </Button>
 
-        <p className="text-center text-xs text-muted-foreground">
-          Demo: Use password <span className="font-mono text-foreground">password123</span>
-        </p>
       </form>
     </motion.div>
   );
