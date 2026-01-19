@@ -8,7 +8,7 @@ Private, authenticated investor portal powered by Firebase Auth + Firestore and 
   - `check-allowlist.ts` - validates approved email/domain
   - `create-user.ts` - syncs user profile after auth
   - `send-investor-update.ts` - sends update emails via Resend SMTP
-  - `unsubscribe.ts` - one-click unsubscribe handler
+  - `unsubscribe.ts` - unsubscribe handler (legacy, no longer used in emails)
 - `src`
   - `components/auth` - gated auth flow with email link signup
   - `pages/Admin.tsx` - admin update composer
@@ -62,7 +62,7 @@ Functions run in `netlify/functions` and use Firebase Admin SDK:
 - `check-allowlist`: gate access by exact email or domain.
 - `create-user`: syncs user profile and login metadata.
 - `send-investor-update`: creates update + sends emails via Resend SMTP.
-- `unsubscribe`: updates `subscribed=false` with signed token.
+- `unsubscribe`: updates `subscribed=false` with signed token (legacy, no longer used in emails).
 
 Required Netlify env vars (set in Netlify dashboard → Site settings → Environment variables):
 
@@ -80,7 +80,9 @@ Required Netlify env vars (set in Netlify dashboard → Site settings → Enviro
 **Other required variables:**
 - `RESEND_API_KEY` - Used as SMTP password (username is `resend`)
 - `RESEND_FROM` - Email address to send from (must be verified domain)
-- `UNSUBSCRIBE_SECRET` - Secret for signing unsubscribe tokens
+
+**Optional email variables:**
+- `RESEND_REPLY_TO` - Reply-to email address (defaults to `mdil@goaimex.com`)
 
 **Frontend environment variables (set in Netlify Build settings):**
 - `VITE_EMAIL_LINK_REDIRECT_URL` - **Required for production!** Set to your production URL (e.g., `https://updates.goaimex.com/auth`). 

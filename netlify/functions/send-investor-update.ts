@@ -1,6 +1,5 @@
 import type { Handler } from "@netlify/functions";
 import { FieldValue } from "firebase-admin/firestore";
-import { createHmac } from "crypto";
 import nodemailer from "nodemailer";
 import { adminAuth, adminDb } from "./lib/firebase";
 import { jsonResponse } from "./lib/response";
@@ -28,10 +27,6 @@ const chunkArray = <T,>(items: T[], size: number) => {
   return chunks;
 };
 
-const signUnsubscribeToken = (email: string, secret: string) => {
-  const signature = createHmac("sha256", secret).update(email).digest("base64url");
-  return Buffer.from(`${email}:${signature}`).toString("base64url");
-};
 
 const isAdmin = async (email: string) => {
   const adminDoc = await adminDb.collection("admins").doc(email.toLowerCase()).get();
@@ -93,10 +88,10 @@ export const handler: Handler = async (event) => {
 
     const resendApiKey = process.env.RESEND_API_KEY;
     const resendFrom = process.env.RESEND_FROM;
-    const unsubscribeSecret = process.env.UNSUBSCRIBE_SECRET;
+    const resendReplyTo = process.env.RESEND_REPLY_TO || "mdil@goaimex.com";
     const smtpPort = process.env.RESEND_SMTP_PORT || "587";
 
-    if (!resendApiKey || !resendFrom || !unsubscribeSecret) {
+    if (!resendApiKey || !resendFrom) {
       return jsonResponse(500, { error: "Email configuration missing." });
     }
 
@@ -120,15 +115,13 @@ export const handler: Handler = async (event) => {
     const chunks = chunkArray(recipients, 50);
     for (const chunk of chunks) {
       const emailPromises = chunk.map((recipient) => {
-        const unsubscribeToken = signUnsubscribeToken(recipient, unsubscribeSecret);
-        const unsubscribeUrl = `${siteUrl}/.netlify/functions/unsubscribe?token=${unsubscribeToken}`;
-
         // Generate idempotency key to prevent duplicate emails
         const idempotencyKey = `update-${updateRef.id}-${recipient}`;
 
         return transporter.sendMail({
           from: resendFrom,
           to: recipient,
+          replyTo: resendReplyTo,
           subject,
           html: `
             <div style="font-family: Arial, sans-serif; color: #0f172a;">
@@ -137,21 +130,17 @@ export const handler: Handler = async (event) => {
               <p>
                 <a href="${updateUrl}" style="color: #2563eb; text-decoration: none;">View full update</a>
               </p>
-              <div style="margin-top: 16px;">
-                <a
-                  href="${unsubscribeUrl}"
-                  style="display: inline-block; padding: 10px 16px; border-radius: 6px; background: #e2e8f0; color: #0f172a; text-decoration: none; font-size: 12px;"
-                >
-                  Unsubscribe
-                </a>
+              <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b;">
+                <p style="margin: 0;">
+                  If you do not wish to receive these updates, please email us at 
+                  <a href="mailto:${resendReplyTo}" style="color: #2563eb; text-decoration: none;">${resendReplyTo}</a>
+                </p>
               </div>
             </div>
           `,
-          text: `${title}\n\n${excerpt}\n\nView full update: ${updateUrl}\nUnsubscribe: ${unsubscribeUrl}`,
+          text: `${title}\n\n${excerpt}\n\nView full update: ${updateUrl}\n\nIf you do not wish to receive these updates, please email us at ${resendReplyTo}`,
           headers: {
             "Resend-Idempotency-Key": idempotencyKey,
-            "List-Unsubscribe": `<${unsubscribeUrl}>`,
-            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
           },
         });
       });
