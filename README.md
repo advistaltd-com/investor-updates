@@ -82,6 +82,13 @@ Required Netlify env vars (set in Netlify dashboard → Site settings → Enviro
 - `RESEND_FROM` - Email address to send from (must be verified domain)
 - `UNSUBSCRIBE_SECRET` - Secret for signing unsubscribe tokens
 
+**Frontend environment variables (set in Netlify Build settings):**
+- `VITE_EMAIL_LINK_REDIRECT_URL` - **Required for production!** Set to your production URL (e.g., `https://updates.goaimex.com/auth`). 
+  - **Important**: This must be set in Netlify's Build environment variables (not just runtime env vars) because Vite needs it at build time.
+  - Without this, email links will redirect to localhost or the wrong URL.
+  - Go to: Netlify Dashboard → Site settings → Build & deploy → Environment → Add variable
+  - **Note**: After setting this, you must redeploy for it to take effect. Existing email links sent before the fix will still redirect to the old URL - users will need to request a new link.
+
 Optional Netlify env vars:
 
 - `RESEND_SMTP_PORT` - SMTP port (default: `587`). Options: `25`, `465`, `587`, `2465`, `2587`
