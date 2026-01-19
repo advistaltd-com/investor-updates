@@ -3,25 +3,51 @@ import { adminDb } from "./lib/firebase";
 import { jsonResponse } from "./lib/response";
 
 export const handler: Handler = async (event) => {
+  console.log("Seed function called:", {
+    method: event.httpMethod,
+    hasBody: !!event.body,
+    headers: Object.keys(event.headers),
+  });
+
   // Only allow POST requests
   if (event.httpMethod !== "POST") {
-    return jsonResponse(405, { error: "Method not allowed" });
+    console.log("Method not allowed:", event.httpMethod);
+    return jsonResponse(405, { error: "Method not allowed. Use POST." });
   }
 
-  // Optional: Add a secret key check for security
-  const secretKey = event.headers["x-seed-secret"] || event.queryStringParameters?.secret;
+  // Check for secret key (case-insensitive header lookup)
+  const secretKey = 
+    event.headers["x-seed-secret"] || 
+    event.headers["X-Seed-Secret"] ||
+    event.queryStringParameters?.secret;
   const expectedSecret = process.env.SEED_SECRET || "change-me-in-production";
   
+  console.log("Secret check:", {
+    hasSecretKey: !!secretKey,
+    hasExpectedSecret: !!expectedSecret,
+    secretMatches: secretKey === expectedSecret,
+  });
+  
   if (secretKey !== expectedSecret) {
-    return jsonResponse(401, { error: "Unauthorized. Provide valid x-seed-secret header or secret query param." });
+    console.log("Unauthorized - secret mismatch");
+    return jsonResponse(401, { 
+      error: "Unauthorized. Provide valid x-seed-secret header or secret query param.",
+      hint: "Set SEED_SECRET env var and include it in the request."
+    });
   }
 
   try {
     const adminEmailRaw = process.env.SEED_ADMIN_EMAIL?.trim();
     if (!adminEmailRaw) {
-      return jsonResponse(400, { error: "Missing SEED_ADMIN_EMAIL env var." });
+      console.error("Missing SEED_ADMIN_EMAIL environment variable");
+      return jsonResponse(400, { 
+        error: "Missing SEED_ADMIN_EMAIL env var.",
+        hint: "Set SEED_ADMIN_EMAIL in Netlify environment variables."
+      });
     }
     const adminEmail = adminEmailRaw.toLowerCase();
+    
+    console.log("Starting seed for admin email:", adminEmail);
     
     // 1. Add to approved_emails collection (check for duplicates first)
     const existingApprovedEmail = await adminDb
@@ -48,8 +74,12 @@ export const handler: Handler = async (event) => {
     
     if (!adminDoc.exists) {
       await adminRef.set({ email: adminEmail });
+      console.log("Created admin document for:", adminEmail);
+    } else {
+      console.log("Admin document already exists for:", adminEmail);
     }
     
+    console.log("Seed completed successfully");
     return jsonResponse(200, {
       success: true,
       message: "Database seeded successfully (idempotent - duplicates skipped)",
@@ -63,9 +93,12 @@ export const handler: Handler = async (event) => {
     });
   } catch (error) {
     console.error("Seed error:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    console.error("Error details:", { errorMessage, errorStack });
     return jsonResponse(500, {
       error: "Failed to seed database",
-      details: error instanceof Error ? error.message : "Unknown error",
+      details: errorMessage,
     });
   }
 };
