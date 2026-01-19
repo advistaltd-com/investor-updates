@@ -14,6 +14,7 @@ import {
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { getFunctionUrl } from "@/lib/functions";
+import { cachedFetch } from "@/lib/cache";
 
 export type AuthStep =
   | "email"
@@ -114,11 +115,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const checkEmailApproval = useCallback(
     async (emailToCheck: string): Promise<{ approved: boolean; isExistingUser: boolean }> => {
       try {
-        const response = await fetch(getFunctionUrl("check-allowlist"), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: emailToCheck.toLowerCase().trim() }),
-        });
+        const response = await cachedFetch(
+          getFunctionUrl("check-allowlist"),
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: emailToCheck.toLowerCase().trim() }),
+          },
+          2 * 60 * 1000, // Cache for 2 minutes
+        );
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));

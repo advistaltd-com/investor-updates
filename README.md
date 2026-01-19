@@ -78,7 +78,7 @@ Functions run in `netlify/functions` and use Firebase Admin SDK:
 
 - `check-allowlist`: gate access by email/domain with special handling for generic email providers.
 - `create-user`: syncs user profile and login metadata.
-- `send-investor-update`: creates update + sends emails via Resend SMTP.
+- `send-investor-update`: creates update + sends emails via Resend SMTP. Includes rate limiting (10 requests/hour per admin) and detailed error handling.
 - `get-allowlist`: fetches all approved domains and emails with user metadata (admin only).
 - `manage-allowlist`: add/remove approved domains and emails (admin only). When adding an email, automatically subscribes the user and sends a welcome email.
 - `seed-db`: seed database with admin user and dummy data.
@@ -178,6 +178,42 @@ The modal uses a Netlify Form named `request-access` with fields:
   - Emails in this collection should also exist in `approved_domains` for consistency
 - `timeline_updates` - Investor update posts
 - `admins` - Admin users (document ID = email address, lowercase)
+
+## Client-side Caching
+
+The application includes minimal client-side caching to improve performance:
+
+- **React Query**: Configured with 5-minute stale time and 10-minute garbage collection
+- **Fetch Cache**: In-memory cache for API requests with TTL-based expiration
+  - `check-allowlist` requests cached for 2 minutes
+  - `get-allowlist` requests cached for 1 minute
+  - Cache automatically invalidates on mutations (add/remove email/domain)
+- **Automatic Cleanup**: Expired cache entries are cleaned up automatically
+
+Cache is non-intrusive and only caches GET requests and safe POST requests. It automatically clears when data is modified.
+
+## Rate Limiting
+
+The `send-investor-update` function includes rate limiting to prevent abuse:
+
+- **Limit**: 10 requests per hour per admin user
+- **Window**: 1 hour rolling window
+- **Behavior**: Returns 429 status with reset time when limit exceeded
+- **Storage**: Uses Firestore `rate_limits` collection (automatically managed)
+- **Fail-safe**: Rate limiting fails open on errors to maintain availability
+
+Rate limits are minimal and non-restrictive, providing basic protection without blocking legitimate use.
+
+## Error Handling
+
+The admin dashboard provides detailed error information:
+
+- **Error Types**: Network, Authentication, Timeout, Rate Limit, Server
+- **User-friendly Messages**: Clear, actionable error messages
+- **Partial Success**: Tracks sent/failed counts when some emails fail
+- **Failed Recipients**: Expandable list of failed email addresses with error details
+- **Technical Details**: Developer-friendly error details in dev mode
+- **Rate Limit Info**: Shows reset time when rate limit is exceeded
 
 ## Deployment
 

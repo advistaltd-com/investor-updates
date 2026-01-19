@@ -5,6 +5,7 @@ import remarkGfm from "remark-gfm";
 import { X, Plus, Trash2 } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import { getFunctionUrl } from "@/lib/functions";
+import { cachedFetch, invalidateCache } from "@/lib/cache";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -44,7 +45,17 @@ const Admin: React.FC = () => {
   const [content, setContent] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorDetails, setErrorDetails] = useState<{
+    type?: string;
+    message?: string;
+    resetAt?: number;
+    sent?: number;
+    failed?: number;
+    failedRecipients?: Array<{ email: string; error: string }>;
+    details?: string;
+  } | null>(null);
   const [success, setSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [recentUpdates, setRecentUpdates] = useState<UpdateDoc[]>([]);
   
   // Allowlist management state
@@ -76,12 +87,16 @@ const Admin: React.FC = () => {
 
     try {
       const token = await auth.currentUser.getIdToken();
-      const response = await fetch(getFunctionUrl("get-allowlist"), {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
+      const response = await cachedFetch(
+        getFunctionUrl("get-allowlist"),
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         },
-      });
+        1 * 60 * 1000, // Cache for 1 minute
+      );
 
       if (!response.ok) {
         throw new Error("Failed to load allowlist.");
@@ -126,6 +141,7 @@ const Admin: React.FC = () => {
       }
 
       setNewEmail("");
+      invalidateCache("get-allowlist");
       await loadAllowlist();
     } catch (err) {
       setAllowlistError(err instanceof Error ? err.message : "Failed to add email.");
@@ -160,6 +176,7 @@ const Admin: React.FC = () => {
       }
 
       setNewDomain("");
+      invalidateCache("get-allowlist");
       await loadAllowlist();
     } catch (err) {
       setAllowlistError(err instanceof Error ? err.message : "Failed to add domain.");
@@ -195,6 +212,7 @@ const Admin: React.FC = () => {
         throw new Error(errorData.error || "Failed to remove email.");
       }
 
+      invalidateCache("get-allowlist");
       await loadAllowlist();
     } catch (err) {
       setAllowlistError(err instanceof Error ? err.message : "Failed to remove email.");
@@ -242,6 +260,7 @@ const Admin: React.FC = () => {
         throw new Error(errorData.error || "Failed to remove domain.");
       }
 
+      invalidateCache("get-allowlist");
       await loadAllowlist();
     } catch (err) {
       setAllowlistError(err instanceof Error ? err.message : "Failed to remove domain.");
@@ -255,7 +274,9 @@ const Admin: React.FC = () => {
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
+    setErrorDetails(null);
     setSuccess(false);
+    setSuccessMessage(null);
 
     if (!title.trim() || content.trim().length < 20) {
       setError("Add a title and at least 20 characters of content.");
@@ -283,15 +304,65 @@ const Admin: React.FC = () => {
         }),
       });
 
+      const data = await response.json().catch(() => ({}));
+
       if (!response.ok) {
-        throw new Error("Failed to send update. Please retry.");
+        // Handle rate limiting
+        if (response.status === 429) {
+          const resetAt = data.resetAt ? new Date(data.resetAt) : null;
+          setError("Rate limit exceeded");
+          setErrorDetails({
+            type: data.type || "RateLimit",
+            message: data.message || "Too many update requests. Please try again later.",
+            resetAt: data.resetAt,
+          });
+          return;
+        }
+
+        // Handle other errors with details
+        setError(data.message || data.error || "Failed to send update.");
+        setErrorDetails({
+          type: data.type,
+          message: data.message,
+          sent: data.sent,
+          failed: data.failed,
+          failedRecipients: data.failedRecipients,
+          details: data.details,
+        });
+        return;
       }
 
+      // Success (200) or partial success (207)
       setTitle("");
       setContent("");
       setSuccess(true);
+      
+      if (response.status === 207) {
+        // Partial success
+        setSuccessMessage(
+          data.message || `Update sent to ${data.sent || 0} recipients. ${data.failed || 0} failed.`
+        );
+        if (data.failedRecipients && data.failedRecipients.length > 0) {
+          setErrorDetails({
+            type: "PartialSuccess",
+            sent: data.sent,
+            failed: data.failed,
+            failedRecipients: data.failedRecipients,
+          });
+        }
+      } else {
+        // Full success
+        setSuccessMessage(
+          data.message || `Update sent successfully to ${data.recipients || data.sent || 0} recipients.`
+        );
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to send update.");
+      setErrorDetails({
+        type: "Network",
+        message: "Network error. Please check your connection and try again.",
+        details: err instanceof Error ? err.message : undefined,
+      });
     } finally {
       setIsSending(false);
     }
@@ -339,8 +410,76 @@ const Admin: React.FC = () => {
               />
             </div>
 
-            {error && <p className="text-destructive text-sm">{error}</p>}
-            {success && <p className="text-emerald-400 text-sm">Update sent to subscribed investors.</p>}
+            {error && (
+              <div className="space-y-2">
+                <p className="text-destructive text-sm font-medium">{error}</p>
+                {errorDetails && (
+                  <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 space-y-2">
+                    {errorDetails.type && (
+                      <p className="text-xs text-muted-foreground">
+                        Error Type: <span className="font-mono">{errorDetails.type}</span>
+                      </p>
+                    )}
+                    {errorDetails.message && errorDetails.type !== "RateLimit" && (
+                      <p className="text-sm text-foreground">{errorDetails.message}</p>
+                    )}
+                    {errorDetails.resetAt && (
+                      <p className="text-xs text-muted-foreground">
+                        You can try again after: {new Date(errorDetails.resetAt).toLocaleString()}
+                      </p>
+                    )}
+                    {errorDetails.sent !== undefined && errorDetails.failed !== undefined && (
+                      <div className="text-sm">
+                        <span className="text-emerald-400">✓ {errorDetails.sent} sent</span>
+                        {errorDetails.failed > 0 && (
+                          <span className="text-destructive ml-3">✗ {errorDetails.failed} failed</span>
+                        )}
+                      </div>
+                    )}
+                    {errorDetails.failedRecipients && errorDetails.failedRecipients.length > 0 && (
+                      <details className="text-xs">
+                        <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                          View failed recipients ({errorDetails.failedRecipients.length})
+                        </summary>
+                        <ul className="mt-2 space-y-1 list-disc list-inside">
+                          {errorDetails.failedRecipients.map((item, idx) => (
+                            <li key={idx} className="text-muted-foreground">
+                              <span className="font-mono">{item.email}</span>: {item.error}
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    )}
+                    {errorDetails.details && import.meta.env.DEV && (
+                      <p className="text-xs font-mono text-muted-foreground mt-2 p-2 bg-background rounded">
+                        {errorDetails.details}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+            {success && (
+              <div className="space-y-2">
+                <p className="text-emerald-400 text-sm font-medium">
+                  {successMessage || "Update sent to subscribed investors."}
+                </p>
+                {errorDetails?.type === "PartialSuccess" && errorDetails.failedRecipients && (
+                  <details className="text-xs bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3">
+                    <summary className="cursor-pointer text-yellow-400 hover:text-yellow-300">
+                      View failed recipients ({errorDetails.failedRecipients.length})
+                    </summary>
+                    <ul className="mt-2 space-y-1 list-disc list-inside text-muted-foreground">
+                      {errorDetails.failedRecipients.map((item, idx) => (
+                        <li key={idx}>
+                          <span className="font-mono">{item.email}</span>: {item.error}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+              </div>
+            )}
 
             <Button
               type="submit"

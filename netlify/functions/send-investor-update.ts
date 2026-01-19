@@ -3,6 +3,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import nodemailer from "nodemailer";
 import { adminAuth, adminDb } from "./lib/firebase";
 import { jsonResponse } from "./lib/response";
+import { checkRateLimit } from "./lib/rate-limit";
 
 const getBearerToken = (authorization?: string) => {
   if (!authorization) return null;
@@ -53,6 +54,21 @@ export const handler: Handler = async (event) => {
     const userIsAdmin = await isAdmin(email);
     if (!userIsAdmin) {
       return jsonResponse(403, { error: "Admin privileges required." });
+    }
+
+    // Rate limiting: 10 requests per hour per admin
+    const rateLimit = await checkRateLimit(decoded.uid, {
+      maxRequests: 10,
+      windowMs: 60 * 60 * 1000, // 1 hour
+    });
+
+    if (!rateLimit.allowed) {
+      return jsonResponse(429, {
+        error: "Rate limit exceeded",
+        message: "Too many update requests. Please try again later.",
+        resetAt: rateLimit.resetAt,
+        type: "RateLimit",
+      });
     }
 
     const payload = JSON.parse(event.body || "{}");
@@ -137,52 +153,112 @@ export const handler: Handler = async (event) => {
 
     // Send emails in chunks to respect rate limits
     const chunks = chunkArray(recipients, 50);
+    let sentCount = 0;
+    let failedCount = 0;
+    const failedRecipients: Array<{ email: string; error: string }> = [];
+
     for (const chunk of chunks) {
-      const emailPromises = chunk.map((recipient) => {
+      const emailPromises = chunk.map(async (recipient) => {
         // Generate idempotency key to prevent duplicate emails
         const idempotencyKey = `update-${updateRef.id}-${recipient}`;
 
-        return transporter.sendMail({
-          from: resendFrom,
-          to: recipient,
-          replyTo: resendReplyTo,
-          subject,
-          html: `
-            <div style="font-family: Arial, sans-serif; color: #0f172a;">
-              <h2 style="margin-bottom: 8px;">${title}</h2>
-              <p style="margin-top: 0; color: #475569;">${excerpt}</p>
-              <p>
-                <a href="${updateUrl}" style="color: #2563eb; text-decoration: none;">View full update</a>
-              </p>
-              <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b;">
-                <p style="margin: 0;">
-                  If you do not wish to receive these updates, please email us at 
-                  <a href="mailto:${resendReplyTo}" style="color: #2563eb; text-decoration: none;">${resendReplyTo}</a>
+        try {
+          await transporter.sendMail({
+            from: resendFrom,
+            to: recipient,
+            replyTo: resendReplyTo,
+            subject,
+            html: `
+              <div style="font-family: Arial, sans-serif; color: #0f172a;">
+                <h2 style="margin-bottom: 8px;">${title}</h2>
+                <p style="margin-top: 0; color: #475569;">${excerpt}</p>
+                <p>
+                  <a href="${updateUrl}" style="color: #2563eb; text-decoration: none;">View full update</a>
                 </p>
+                <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b;">
+                  <p style="margin: 0;">
+                    If you do not wish to receive these updates, please email us at 
+                    <a href="mailto:${resendReplyTo}" style="color: #2563eb; text-decoration: none;">${resendReplyTo}</a>
+                  </p>
+                </div>
               </div>
-            </div>
-          `,
-          text: `${title}\n\n${excerpt}\n\nView full update: ${updateUrl}\n\nIf you do not wish to receive these updates, please email us at ${resendReplyTo}`,
-          headers: {
-            "Resend-Idempotency-Key": idempotencyKey,
-          },
-        });
+            `,
+            text: `${title}\n\n${excerpt}\n\nView full update: ${updateUrl}\n\nIf you do not wish to receive these updates, please email us at ${resendReplyTo}`,
+            headers: {
+              "Resend-Idempotency-Key": idempotencyKey,
+            },
+          });
+          sentCount++;
+        } catch (error) {
+          failedCount++;
+          const errorMessage = error instanceof Error ? error.message : "Unknown error";
+          failedRecipients.push({ email: recipient, error: errorMessage });
+          console.error(`Failed to send email to ${recipient}:`, errorMessage);
+        }
       });
 
       await Promise.all(emailPromises);
     }
 
-    await updateRef.update({ email_sent: true });
+    // Update document with send status
+    await updateRef.update({ 
+      email_sent: failedCount === 0,
+      sent_count: sentCount,
+      failed_count: failedCount,
+    });
 
-    return jsonResponse(200, { ok: true, recipients: recipients.length });
+    // If all emails failed, delete the update document
+    if (sentCount === 0 && failedCount > 0) {
+      await updateRef.delete();
+      return jsonResponse(500, {
+        error: "Failed to send update",
+        type: "Network",
+        message: "All emails failed to send. Please check your email configuration and try again.",
+        details: process.env.NODE_ENV === "development" ? failedRecipients : undefined,
+        sent: 0,
+        failed: failedCount,
+      });
+    }
+
+    // Partial success or full success
+    const statusCode = failedCount > 0 ? 207 : 200; // 207 Multi-Status for partial success
+    return jsonResponse(statusCode, {
+      ok: true,
+      recipients: recipients.length,
+      sent: sentCount,
+      failed: failedCount,
+      failedRecipients: failedCount > 0 ? failedRecipients : undefined,
+      message: failedCount > 0 
+        ? `Update sent to ${sentCount} recipients. ${failedCount} failed.`
+        : `Update sent successfully to ${sentCount} recipients.`,
+    });
   } catch (err) {
     console.error("Error in send-investor-update:", err);
     const errorMessage = err instanceof Error ? err.message : "Unknown error";
     const errorStack = err instanceof Error ? err.stack : undefined;
     console.error("Error details:", { errorMessage, errorStack });
-    return jsonResponse(500, { 
-      error: "Failed to send update.",
-      details: errorMessage,
+
+    // Determine error type
+    let errorType = "Server";
+    let userMessage = "An unexpected error occurred. Please try again.";
+
+    if (err instanceof TypeError && errorMessage.includes("fetch")) {
+      errorType = "Network";
+      userMessage = "Network error: Unable to connect to email service.";
+    } else if (errorMessage.includes("timeout") || errorMessage.includes("ETIMEDOUT")) {
+      errorType = "Timeout";
+      userMessage = "Request timed out. Please try again.";
+    } else if (errorMessage.includes("auth") || errorMessage.includes("token")) {
+      errorType = "Authentication";
+      userMessage = "Authentication error. Please sign in again.";
+    }
+
+    return jsonResponse(500, {
+      error: "Failed to send update",
+      type: errorType,
+      message: userMessage,
+      details: process.env.NODE_ENV === "development" ? errorMessage : undefined,
+      stack: process.env.NODE_ENV === "development" ? errorStack : undefined,
     });
   }
 };
