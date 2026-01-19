@@ -11,21 +11,28 @@ const getBearerToken = (authorization?: string) => {
 
 const isApproved = async (email: string) => {
   const domain = email.split("@")[1] || "";
-  const emailSnap = await adminDb
-    .collection("approved_emails")
-    .where("email", "==", email)
-    .limit(1)
-    .get();
+  
+  // Check if domain document exists (domain as document ID)
+  const domainDoc = await adminDb.collection("approved_domains").doc(domain).get();
+  
+  if (!domainDoc.exists) {
+    return false;
+  }
 
-  if (!emailSnap.empty) return true;
+  const domainData = domainDoc.data();
+  if (!domainData) {
+    return false;
+  }
 
-  const domainSnap = await adminDb
-    .collection("approved_domains")
-    .where("domain", "==", domain)
-    .limit(1)
-    .get();
+  // Check if email is in the domain's emails array
+  const emails = domainData.emails || [];
+  if (emails.includes(email)) {
+    return true;
+  }
 
-  return !domainSnap.empty;
+  // Empty array means no emails are approved for this domain
+  // Domain document must have at least one email in the array to approve users
+  return false;
 };
 
 export const handler: Handler = async (event) => {
@@ -67,6 +74,11 @@ export const handler: Handler = async (event) => {
 
     return jsonResponse(200, { ok: true });
   } catch (err) {
-    return jsonResponse(500, { error: "Unable to sync user." });
+    console.error("Error in create-user:", err);
+    const errorMessage = err instanceof Error ? err.message : "Unknown error";
+    return jsonResponse(500, { 
+      error: "Unable to sync user.",
+      details: errorMessage,
+    });
   }
 };

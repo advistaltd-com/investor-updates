@@ -48,10 +48,10 @@ export const handler: Handler = async (event) => {
     const adminEmail = adminEmailRaw.toLowerCase();
     
     // Dummy data for testing - organized by domain
+    // Note: Empty arrays are not allowed - domains must have at least one email
     const dummyData = {
       "example.com": ["investor1@example.com", "investor2@example.com"],
       "test.com": ["partner@test.com"],
-      "demo.org": [],
     };
     
     console.log("Starting seed for admin email:", adminEmail);

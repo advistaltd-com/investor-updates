@@ -107,10 +107,10 @@ const seedDatabase = async () => {
   console.log(`\n🌱 Seeding database with admin email: ${adminEmail}\n`);
 
   // Dummy data for testing - organized by domain
+  // Note: Empty arrays are not allowed - domains must have at least one email
   const dummyData = {
     "example.com": ["investor1@example.com", "investor2@example.com"],
     "test.com": ["partner@test.com"],
-    "demo.org": [],
   };
 
   try {

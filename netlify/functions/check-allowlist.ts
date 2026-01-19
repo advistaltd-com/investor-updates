@@ -53,6 +53,11 @@ export const handler: Handler = async (event) => {
 
     return jsonResponse(200, { approved, isExistingUser });
   } catch (err) {
-    return jsonResponse(500, { error: "Failed to verify allowlist." });
+    console.error("Error in check-allowlist:", err);
+    const errorMessage = err instanceof Error ? err.message : "Unknown error";
+    return jsonResponse(500, { 
+      error: "Failed to verify allowlist.",
+      details: errorMessage,
+    });
   }
 };

@@ -15,36 +15,44 @@ const verifyToken = (token: string, secret: string) => {
 };
 
 export const handler: Handler = async (event) => {
-  const token = event.queryStringParameters?.token;
-  const secret = process.env.UNSUBSCRIBE_SECRET;
+  try {
+    const token = event.queryStringParameters?.token;
+    const secret = process.env.UNSUBSCRIBE_SECRET;
 
-  if (!token || !secret) {
+    if (!token || !secret) {
+      return {
+        statusCode: 400,
+        body: "Invalid unsubscribe request.",
+      };
+    }
+
+    const email = verifyToken(token, secret);
+    if (!email) {
+      return {
+        statusCode: 400,
+        body: "Invalid or expired unsubscribe token.",
+      };
+    }
+
+    const userSnap = await adminDb
+      .collection("users")
+      .where("email", "==", email)
+      .limit(1)
+      .get();
+
+    if (!userSnap.empty) {
+      await userSnap.docs[0].ref.update({ subscribed: false });
+    }
+
     return {
-      statusCode: 400,
-      body: "Invalid unsubscribe request.",
+      statusCode: 200,
+      body: "You have been unsubscribed from investor updates.",
+    };
+  } catch (err) {
+    console.error("Error in unsubscribe:", err);
+    return {
+      statusCode: 500,
+      body: "Failed to process unsubscribe request.",
     };
   }
-
-  const email = verifyToken(token, secret);
-  if (!email) {
-    return {
-      statusCode: 400,
-      body: "Invalid or expired unsubscribe token.",
-    };
-  }
-
-  const userSnap = await adminDb
-    .collection("users")
-    .where("email", "==", email)
-    .limit(1)
-    .get();
-
-  if (!userSnap.empty) {
-    await userSnap.docs[0].ref.update({ subscribed: false });
-  }
-
-  return {
-    statusCode: 200,
-    body: "You have been unsubscribed from investor updates.",
-  };
 };
