@@ -71,15 +71,38 @@ export const handler: Handler = async (event) => {
       email_sent: false,
     });
 
-    const usersSnap = await adminDb
-      .collection("users")
-      .where("approved", "==", true)
-      .where("subscribed", "==", true)
-      .get();
+    // Get all approved emails from approved_domains (single source of truth)
+    const domainsSnap = await adminDb.collection("approved_domains").get();
+    const allApprovedEmails = new Set<string>();
+    
+    domainsSnap.docs.forEach((doc) => {
+      const domainData = doc.data();
+      const emails = domainData.emails || [];
+      emails.forEach((email: string) => {
+        if (typeof email === "string" && email.includes("@")) {
+          allApprovedEmails.add(email.toLowerCase());
+        }
+      });
+    });
 
-    const recipients = usersSnap.docs
-      .map((doc) => doc.data().email)
-      .filter((email) => typeof email === "string");
+    // Get subscribed status from users collection
+    // Build a map of email -> subscribed status
+    const usersSnap = await adminDb.collection("users").get();
+    const emailSubscribedMap = new Map<string, boolean>();
+    
+    usersSnap.docs.forEach((doc) => {
+      const userData = doc.data();
+      const userEmail = userData.email?.toLowerCase();
+      if (userEmail && typeof userEmail === "string") {
+        // Default to true if not set (backward compatibility)
+        emailSubscribedMap.set(userEmail, userData.subscribed ?? true);
+      }
+    });
+
+    // Filter to only subscribed emails that are in approved_domains
+    const recipients = Array.from(allApprovedEmails).filter((email) => {
+      return emailSubscribedMap.get(email) !== false; // Include if subscribed is true or undefined
+    });
 
     if (recipients.length === 0) {
       await updateRef.update({ email_sent: true });
@@ -109,7 +132,8 @@ export const handler: Handler = async (event) => {
     const siteUrl = process.env.URL || process.env.DEPLOY_PRIME_URL || "http://localhost:8888";
     const updateUrl = `${siteUrl}/investor?update=${updateRef.id}`;
     const excerpt = stripMarkdown(contentMd).slice(0, 240);
-    const subject = `Investor Update: ${title}`;
+    const subjectPrefix = process.env.EMAIL_SUBJECT_PREFIX || "GoAiMEX Update";
+    const subject = `${subjectPrefix}: ${title}`;
 
     // Send emails in chunks to respect rate limits
     const chunks = chunkArray(recipients, 50);

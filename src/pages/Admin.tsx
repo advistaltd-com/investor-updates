@@ -20,10 +20,17 @@ interface UpdateDoc {
   email_sent?: boolean;
 }
 
+interface EmailInfo {
+  email: string;
+  subscribed: boolean;
+  last_login?: any;
+  created_at?: any;
+}
+
 interface AllowlistDomain {
   id: string;
   domain: string;
-  emails: string[];
+  emails: EmailInfo[];
 }
 
 const Admin: React.FC = () => {
@@ -464,7 +471,20 @@ const Admin: React.FC = () => {
                             {expandedDomains.has(domain.id) ? "▼" : "▶"} {domain.domain}
                           </button>
                           <span className="text-xs text-muted-foreground">
-                            ({domain.emails.length} {domain.emails.length === 1 ? "email" : "emails"})
+                            {(() => {
+                              const subscribedCount = domain.emails.filter((e) => {
+                                const subscribed = typeof e === "object" ? e.subscribed : true;
+                                return subscribed;
+                              }).length;
+                              return (
+                                <>
+                                  ({domain.emails.length} {domain.emails.length === 1 ? "email" : "emails"})
+                                  {subscribedCount > 0 && subscribedCount < domain.emails.length && (
+                                    <span className="ml-1">· {subscribedCount} subscribed</span>
+                                  )}
+                                </>
+                              );
+                            })()}
                           </span>
                         </div>
                         <Button
@@ -483,23 +503,32 @@ const Admin: React.FC = () => {
                             <p className="text-xs text-muted-foreground">No emails for this domain</p>
                           ) : (
                             <div className="space-y-2">
-                              {domain.emails.map((email) => (
-                                <div
-                                  key={email}
-                                  className="flex items-center justify-between p-2 bg-secondary/20 rounded"
-                                >
-                                  <span className="text-xs text-foreground">{email}</span>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6 text-destructive hover:text-destructive"
-                                    onClick={() => handleRemoveEmail(email)}
-                                    disabled={isLoadingAllowlist}
+                              {domain.emails.map((emailInfo) => {
+                                const email = typeof emailInfo === "string" ? emailInfo : emailInfo.email;
+                                const subscribed = typeof emailInfo === "object" ? emailInfo.subscribed : true;
+                                return (
+                                  <div
+                                    key={email}
+                                    className="flex items-center justify-between p-2 bg-secondary/20 rounded"
                                   >
-                                    <X className="w-3 h-3" />
-                                  </Button>
-                                </div>
-                              ))}
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs text-foreground">{email}</span>
+                                      {!subscribed && (
+                                        <span className="text-xs text-muted-foreground">(unsubscribed)</span>
+                                      )}
+                                    </div>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6 w-6 text-destructive hover:text-destructive"
+                                      onClick={() => handleRemoveEmail(email)}
+                                      disabled={isLoadingAllowlist}
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </Button>
+                                  </div>
+                                );
+                              })}
                             </div>
                           )}
                         </div>

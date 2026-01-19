@@ -35,14 +35,45 @@ export const handler: Handler = async (event) => {
       return jsonResponse(403, { error: "Admin privileges required." });
     }
 
+    // Get all domains from approved_domains (single source of truth)
     const domainsSnap = await adminDb.collection("approved_domains").get();
+    
+    // Get all users to merge metadata (subscribed, last_login, etc.)
+    const usersSnap = await adminDb.collection("users").get();
+    const emailUserMap = new Map<string, { subscribed: boolean; last_login?: any; created_at?: any }>();
+    
+    usersSnap.docs.forEach((doc) => {
+      const userData = doc.data();
+      const userEmail = userData.email?.toLowerCase();
+      if (userEmail && typeof userEmail === "string") {
+        emailUserMap.set(userEmail, {
+          subscribed: userData.subscribed ?? true,
+          last_login: userData.last_login,
+          created_at: userData.created_at,
+        });
+      }
+    });
 
+    // Merge domain emails with user metadata
     const domains = domainsSnap.docs.map((doc) => {
       const data = doc.data();
+      const emails = data.emails || [];
+      
+      // Enrich each email with user metadata if available
+      const enrichedEmails = emails.map((email: string) => {
+        const userData = emailUserMap.get(email.toLowerCase());
+        return {
+          email,
+          subscribed: userData?.subscribed ?? true,
+          last_login: userData?.last_login || null,
+          created_at: userData?.created_at || null,
+        };
+      });
+
       return {
         id: doc.id, // domain name
         domain: data.domain || doc.id,
-        emails: data.emails || [],
+        emails: enrichedEmails,
       };
     });
 

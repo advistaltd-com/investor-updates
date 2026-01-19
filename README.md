@@ -79,8 +79,8 @@ Functions run in `netlify/functions` and use Firebase Admin SDK:
 - `check-allowlist`: gate access by email/domain with special handling for generic email providers.
 - `create-user`: syncs user profile and login metadata.
 - `send-investor-update`: creates update + sends emails via Resend SMTP.
-- `get-allowlist`: fetches all approved domains and emails (admin only).
-- `manage-allowlist`: add/remove approved domains and emails (admin only).
+- `get-allowlist`: fetches all approved domains and emails with user metadata (admin only).
+- `manage-allowlist`: add/remove approved domains and emails (admin only). When adding an email, automatically subscribes the user and sends a welcome email.
 - `seed-db`: seed database with admin user and dummy data.
 - `unsubscribe`: updates `subscribed=false` with signed token (legacy, no longer used in emails).
 
@@ -104,6 +104,7 @@ Required Netlify env vars (set in Netlify dashboard → Site settings → Enviro
 **Optional email variables:**
 - `RESEND_REPLY_TO` - Reply-to email address (defaults to `admin@example.com` if not set)
 - `RESEND_SMTP_PORT` - SMTP port (default: `587`). Options: `25`, `465`, `587`, `2465`, `2587`
+- `EMAIL_SUBJECT_PREFIX` - Prefix for investor update email subjects (defaults to `GoAiMEX Update`). Example: `EMAIL_SUBJECT_PREFIX="Company Name Update"` will result in subjects like "Company Name Update: {title}"
 
 **Seed function variables (optional):**
 - `SEED_SECRET` - Secret key for seed function authentication (defaults to `change-me-in-production`)
@@ -167,11 +168,14 @@ The modal uses a Netlify Form named `request-access` with fields:
 
 ## Firestore collections
 
-- `approved_domains` - Approved email domains (document ID = domain name)
+- `approved_domains` - **Single source of truth** for approved emails (document ID = domain name)
   - Structure: `{ domain: "example.com", emails: ["user1@example.com", "user2@example.com"] }`
   - **Generic email providers** (gmail.com, yahoo.com, etc.): Require explicit email approval - only emails in the `emails` array are approved
   - **Other domains**: If domain exists, any email from that domain is automatically approved
-- `users` - User profiles synced after authentication
+  - When users sign up and are approved, their emails are automatically added to this collection
+- `users` - User profiles with metadata (subscribed status, last_login, etc.)
+  - Structure: `{ email: "user@example.com", approved: boolean, subscribed: boolean, last_login: timestamp, created_at: timestamp }`
+  - Emails in this collection should also exist in `approved_domains` for consistency
 - `timeline_updates` - Investor update posts
 - `admins` - Admin users (document ID = email address, lowercase)
 
