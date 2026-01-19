@@ -47,6 +47,19 @@ export const handler: Handler = async (event) => {
     }
     const adminEmail = adminEmailRaw.toLowerCase();
     
+    // Dummy data for testing
+    const dummyEmails = [
+      "investor1@example.com",
+      "investor2@example.com",
+      "partner@test.com",
+    ];
+
+    const dummyDomains = [
+      "example.com",
+      "test.com",
+      "demo.org",
+    ];
+    
     console.log("Starting seed for admin email:", adminEmail);
     
     // 1. Add to approved_emails collection (check for duplicates first)
@@ -78,6 +91,36 @@ export const handler: Handler = async (event) => {
     } else {
       console.log("Admin document already exists for:", adminEmail);
     }
+
+    // Add dummy emails
+    let addedEmails = 0;
+    for (const email of dummyEmails) {
+      const existing = await adminDb
+        .collection("approved_emails")
+        .where("email", "==", email)
+        .limit(1)
+        .get();
+
+      if (existing.empty) {
+        await adminDb.collection("approved_emails").add({ email });
+        addedEmails++;
+      }
+    }
+
+    // Add dummy domains
+    let addedDomains = 0;
+    for (const domain of dummyDomains) {
+      const existing = await adminDb
+        .collection("approved_domains")
+        .where("domain", "==", domain)
+        .limit(1)
+        .get();
+
+      if (existing.empty) {
+        await adminDb.collection("approved_domains").add({ domain });
+        addedDomains++;
+      }
+    }
     
     console.log("Seed completed successfully");
     return jsonResponse(200, {
@@ -89,6 +132,8 @@ export const handler: Handler = async (event) => {
         adminDocId: adminRef.id,
         approvedEmailExisted: !approvedEmailWasNew,
         adminExisted: !adminWasNew,
+        dummyEmailsAdded: addedEmails,
+        dummyDomainsAdded: addedDomains,
       },
     });
   } catch (error) {

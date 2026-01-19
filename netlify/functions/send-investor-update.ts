@@ -163,6 +163,13 @@ export const handler: Handler = async (event) => {
 
     return jsonResponse(200, { ok: true, recipients: recipients.length });
   } catch (err) {
-    return jsonResponse(500, { error: "Failed to send update." });
+    console.error("Error in send-investor-update:", err);
+    const errorMessage = err instanceof Error ? err.message : "Unknown error";
+    const errorStack = err instanceof Error ? err.stack : undefined;
+    console.error("Error details:", { errorMessage, errorStack });
+    return jsonResponse(500, { 
+      error: "Failed to send update.",
+      details: errorMessage,
+    });
   }
 };

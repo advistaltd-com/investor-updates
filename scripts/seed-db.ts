@@ -106,6 +106,19 @@ const seedDatabase = async () => {
 
   console.log(`\n🌱 Seeding database with admin email: ${adminEmail}\n`);
 
+  // Dummy data for testing
+  const dummyEmails = [
+    "investor1@example.com",
+    "investor2@example.com",
+    "partner@test.com",
+  ];
+
+  const dummyDomains = [
+    "example.com",
+    "test.com",
+    "demo.org",
+  ];
+
   try {
     // 1. Add to approved_emails collection (check for duplicates first)
     console.log("📧 Checking approved_emails collection...");
@@ -123,6 +136,23 @@ const seedDatabase = async () => {
       console.log(`   ✅ Added approved email (ID: ${approvedEmailRef.id})`);
     }
 
+    // Add dummy emails
+    console.log("📧 Adding dummy approved emails...");
+    for (const email of dummyEmails) {
+      const existing = await db
+        .collection("approved_emails")
+        .where("email", "==", email)
+        .limit(1)
+        .get();
+
+      if (existing.empty) {
+        await db.collection("approved_emails").add({ email });
+        console.log(`   ✅ Added dummy email: ${email}`);
+      } else {
+        console.log(`   ⚠️  Email already exists: ${email} (skipping)`);
+      }
+    }
+
     // 2. Add to admins collection (document ID = email, so duplicates are prevented)
     console.log("👤 Checking admins collection...");
     const adminRef = db.collection("admins").doc(adminEmail);
@@ -133,6 +163,23 @@ const seedDatabase = async () => {
     } else {
       await adminRef.set({ email: adminEmail });
       console.log(`   ✅ Added admin (ID: ${adminRef.id})`);
+    }
+
+    // 3. Add dummy domains
+    console.log("🌐 Adding dummy approved domains...");
+    for (const domain of dummyDomains) {
+      const existing = await db
+        .collection("approved_domains")
+        .where("domain", "==", domain)
+        .limit(1)
+        .get();
+
+      if (existing.empty) {
+        await db.collection("approved_domains").add({ domain });
+        console.log(`   ✅ Added dummy domain: ${domain}`);
+      } else {
+        console.log(`   ⚠️  Domain already exists: ${domain} (skipping)`);
+      }
     }
 
     console.log(`\n✨ Database seeded successfully! (idempotent - safe to run multiple times)\n`);

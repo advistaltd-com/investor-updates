@@ -2,11 +2,13 @@ import React, { useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot, orderBy, limit, query, type Timestamp } from "firebase/firestore";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { X, Plus, Trash2 } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import { getFunctionUrl } from "@/lib/functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Header } from "@/components/layout/Header";
 import { useSEO } from "@/hooks/use-seo";
 
@@ -16,6 +18,16 @@ interface UpdateDoc {
   content_md: string;
   created_at?: Timestamp;
   email_sent?: boolean;
+}
+
+interface AllowlistEmail {
+  id: string;
+  email: string;
+}
+
+interface AllowlistDomain {
+  id: string;
+  domain: string;
 }
 
 const Admin: React.FC = () => {
@@ -31,6 +43,14 @@ const Admin: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [recentUpdates, setRecentUpdates] = useState<UpdateDoc[]>([]);
+  
+  // Allowlist management state
+  const [approvedEmails, setApprovedEmails] = useState<AllowlistEmail[]>([]);
+  const [approvedDomains, setApprovedDomains] = useState<AllowlistDomain[]>([]);
+  const [newEmail, setNewEmail] = useState("");
+  const [newDomain, setNewDomain] = useState("");
+  const [isLoadingAllowlist, setIsLoadingAllowlist] = useState(false);
+  const [allowlistError, setAllowlistError] = useState<string | null>(null);
 
   useEffect(() => {
     const updatesQuery = query(collection(db, "timeline_updates"), orderBy("created_at", "desc"), limit(5));
@@ -44,6 +64,177 @@ const Admin: React.FC = () => {
 
     return () => unsubscribe();
   }, []);
+
+  const loadAllowlist = async () => {
+    if (!auth.currentUser) return;
+
+    setIsLoadingAllowlist(true);
+    setAllowlistError(null);
+
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const response = await fetch(getFunctionUrl("get-allowlist"), {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to load allowlist.");
+      }
+
+      const data = await response.json();
+      setApprovedEmails(data.emails || []);
+      setApprovedDomains(data.domains || []);
+    } catch (err) {
+      setAllowlistError(err instanceof Error ? err.message : "Failed to load allowlist.");
+    } finally {
+      setIsLoadingAllowlist(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAllowlist();
+  }, []);
+
+  const handleAddEmail = async () => {
+    if (!newEmail.trim() || !auth.currentUser) return;
+
+    setAllowlistError(null);
+    setIsLoadingAllowlist(true);
+
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const response = await fetch(getFunctionUrl("manage-allowlist"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          type: "email",
+          value: newEmail.trim().toLowerCase(),
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to add email.");
+      }
+
+      setNewEmail("");
+      await loadAllowlist();
+    } catch (err) {
+      setAllowlistError(err instanceof Error ? err.message : "Failed to add email.");
+    } finally {
+      setIsLoadingAllowlist(false);
+    }
+  };
+
+  const handleAddDomain = async () => {
+    if (!newDomain.trim() || !auth.currentUser) return;
+
+    setAllowlistError(null);
+    setIsLoadingAllowlist(true);
+
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const response = await fetch(getFunctionUrl("manage-allowlist"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          type: "domain",
+          value: newDomain.trim().toLowerCase(),
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to add domain.");
+      }
+
+      setNewDomain("");
+      await loadAllowlist();
+    } catch (err) {
+      setAllowlistError(err instanceof Error ? err.message : "Failed to add domain.");
+    } finally {
+      setIsLoadingAllowlist(false);
+    }
+  };
+
+  const handleRemoveEmail = async (id: string, email: string) => {
+    if (!auth.currentUser) return;
+
+    if (!confirm(`Remove ${email} from approved emails?`)) return;
+
+    setAllowlistError(null);
+    setIsLoadingAllowlist(true);
+
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const response = await fetch(getFunctionUrl("manage-allowlist"), {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          type: "email",
+          value: email,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to remove email.");
+      }
+
+      await loadAllowlist();
+    } catch (err) {
+      setAllowlistError(err instanceof Error ? err.message : "Failed to remove email.");
+    } finally {
+      setIsLoadingAllowlist(false);
+    }
+  };
+
+  const handleRemoveDomain = async (id: string, domain: string) => {
+    if (!auth.currentUser) return;
+
+    if (!confirm(`Remove ${domain} from approved domains?`)) return;
+
+    setAllowlistError(null);
+    setIsLoadingAllowlist(true);
+
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const response = await fetch(getFunctionUrl("manage-allowlist"), {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          type: "domain",
+          value: domain,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to remove domain.");
+      }
+
+      await loadAllowlist();
+    } catch (err) {
+      setAllowlistError(err instanceof Error ? err.message : "Failed to remove domain.");
+    } finally {
+      setIsLoadingAllowlist(false);
+    }
+  };
 
   const previewMarkdown = useMemo(() => content.trim(), [content]);
 
@@ -97,13 +288,20 @@ const Admin: React.FC = () => {
       <Header />
       <div className="max-w-5xl mx-auto px-4 md:px-8 lg:px-10 pt-24 pb-16 space-y-10">
         <div>
-          <h1 className="text-3xl md:text-4xl text-foreground mb-2">Admin Updates</h1>
+          <h1 className="text-3xl md:text-4xl text-foreground mb-2">Admin Dashboard</h1>
           <p className="text-muted-foreground text-sm md:text-base">
-            Publish investor updates and trigger Resend notifications.
+            Manage investor updates and access control.
           </p>
         </div>
 
-        <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
+        <Tabs defaultValue="updates" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="updates">Updates</TabsTrigger>
+            <TabsTrigger value="allowlist">Access Control</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="updates" className="space-y-8">
+            <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
           <form onSubmit={handleSubmit} className="space-y-4 bg-card border border-border rounded-xl p-6">
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">Update title</label>
@@ -171,6 +369,126 @@ const Admin: React.FC = () => {
             </div>
           </div>
         </div>
+          </TabsContent>
+
+          <TabsContent value="allowlist" className="space-y-6">
+            <div className="grid gap-6 md:grid-cols-2">
+              {/* Approved Emails */}
+              <div className="bg-card border border-border rounded-xl p-6">
+                <h2 className="text-lg font-semibold text-foreground mb-4">Approved Emails</h2>
+                
+                <div className="space-y-3 mb-4">
+                  <div className="flex gap-2">
+                    <Input
+                      type="email"
+                      placeholder="investor@example.com"
+                      value={newEmail}
+                      onChange={(e) => setNewEmail(e.target.value)}
+                      className="bg-secondary/50 border-border"
+                      disabled={isLoadingAllowlist}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleAddEmail();
+                        }
+                      }}
+                    />
+                    <Button
+                      onClick={handleAddEmail}
+                      disabled={!newEmail.trim() || isLoadingAllowlist}
+                      size="icon"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                {allowlistError && (
+                  <p className="text-destructive text-sm mb-4">{allowlistError}</p>
+                )}
+
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {approvedEmails.length === 0 ? (
+                    <p className="text-muted-foreground text-sm">No approved emails yet.</p>
+                  ) : (
+                    approvedEmails.map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex items-center justify-between p-2 bg-secondary/30 rounded border border-border"
+                      >
+                        <span className="text-sm text-foreground">{item.email}</span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive hover:text-destructive"
+                          onClick={() => handleRemoveEmail(item.id, item.email)}
+                          disabled={isLoadingAllowlist}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Approved Domains */}
+              <div className="bg-card border border-border rounded-xl p-6">
+                <h2 className="text-lg font-semibold text-foreground mb-4">Approved Domains</h2>
+                
+                <div className="space-y-3 mb-4">
+                  <div className="flex gap-2">
+                    <Input
+                      type="text"
+                      placeholder="example.com"
+                      value={newDomain}
+                      onChange={(e) => setNewDomain(e.target.value)}
+                      className="bg-secondary/50 border-border"
+                      disabled={isLoadingAllowlist}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleAddDomain();
+                        }
+                      }}
+                    />
+                    <Button
+                      onClick={handleAddDomain}
+                      disabled={!newDomain.trim() || isLoadingAllowlist}
+                      size="icon"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {approvedDomains.length === 0 ? (
+                    <p className="text-muted-foreground text-sm">No approved domains yet.</p>
+                  ) : (
+                    approvedDomains.map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex items-center justify-between p-2 bg-secondary/30 rounded border border-border"
+                      >
+                        <span className="text-sm text-foreground">{item.domain}</span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive hover:text-destructive"
+                          onClick={() => handleRemoveDomain(item.id, item.domain)}
+                          disabled={isLoadingAllowlist}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
