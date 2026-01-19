@@ -1,6 +1,7 @@
 import type { Handler } from "@netlify/functions";
 import { adminAuth, adminDb } from "./lib/firebase";
 import { jsonResponse } from "./lib/response";
+import { isGenericEmailProvider } from "./lib/allowlist";
 
 const isApproved = async (email: string) => {
   const domain = email.split("@")[1] || "";
@@ -17,15 +18,16 @@ const isApproved = async (email: string) => {
     return false;
   }
 
-  // Check if email is in the domain's emails array
-  const emails = domainData.emails || [];
-  if (emails.includes(email)) {
-    return true;
+  // For generic email providers (gmail, yahoo, etc.), require explicit email approval
+  if (isGenericEmailProvider(domain)) {
+    const emails = domainData.emails || [];
+    // Only approve if email is explicitly in the emails array
+    return emails.includes(email);
   }
 
-  // Empty array means no emails are approved for this domain
-  // Domain document must have at least one email in the array to approve users
-  return false;
+  // For non-generic domains, if domain exists, approve any email from that domain
+  // This allows companies to approve their entire domain without listing every email
+  return true;
 };
 
 export const handler: Handler = async (event) => {

@@ -36,8 +36,9 @@ Private, authenticated investor portal powered by Firebase Auth + Firestore and 
    - Email/password (for returning users)
    - Email link (passwordless) for initial signup
 3. Create Firestore and add allowlists:
-   - `approved_emails` docs with `{ email: string }`
-   - `approved_domains` docs with `{ domain: string }`
+   - `approved_domains` collection with domain as document ID
+   - Document structure: `{ domain: "example.com", emails: ["user1@example.com"] }`
+   - **Note**: Generic email providers (gmail.com, yahoo.com, etc.) require explicit email approval even if domain is added
 4. Add Firestore rules from `firestore.rules`.
 5. Create a service account and set:
    - `FIREBASE_SERVICE_ACCOUNT` in Netlify env vars (JSON or base64).
@@ -52,14 +53,14 @@ Private, authenticated investor portal powered by Firebase Auth + Firestore and 
    - **Manual way**: Create a document in the `admins` collection with the admin's email as the document ID (lowercase).
      - Example: Collection `admins`, Document ID: `admin@example.com`
      - Document data: `{ email: "admin@example.com" }` (optional fields)
-     - Also add the email to `approved_emails` collection
+     - Also add the email to `approved_domains` collection (add to domain's emails array)
    - The user must sign in once to create their account before they can access admin features.
 
 ## Netlify functions
 
 Functions run in `netlify/functions` and use Firebase Admin SDK:
 
-- `check-allowlist`: gate access by exact email or domain.
+- `check-allowlist`: gate access by email/domain with special handling for generic email providers.
 - `create-user`: syncs user profile and login metadata.
 - `send-investor-update`: creates update + sends emails via Resend SMTP.
 - `unsubscribe`: updates `subscribed=false` with signed token (legacy, no longer used in emails).
@@ -115,7 +116,7 @@ npm run seed
 ```
 
 This will:
-- Add the email in `ADMIN_EMAIL` to the `approved_emails` collection
+- Add the email in `ADMIN_EMAIL` to the `approved_domains` collection (in its domain's emails array)
 - Add the email in `ADMIN_EMAIL` to the `admins` collection
 
 Set the admin email (required):
@@ -150,8 +151,10 @@ The modal uses a Netlify Form named `request-access` with fields:
 
 ## Firestore collections
 
-- `approved_emails` - Individual approved email addresses
-- `approved_domains` - Approved email domains
+- `approved_domains` - Approved email domains (document ID = domain name)
+  - Structure: `{ domain: "example.com", emails: ["user1@example.com", "user2@example.com"] }`
+  - **Generic email providers** (gmail.com, yahoo.com, etc.): Require explicit email approval - only emails in the `emails` array are approved
+  - **Other domains**: If domain exists, any email from that domain is automatically approved
 - `users` - User profiles synced after authentication
 - `timeline_updates` - Investor update posts
 - `admins` - Admin users (document ID = email address, lowercase)
