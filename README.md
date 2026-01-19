@@ -5,7 +5,7 @@ Open-source, authenticated investor portal powered by Firebase Auth + Firestore 
 ## Features
 
 - 🔐 **Secure Authentication**: Email link (passwordless) signup with password setup
-- 📧 **Email Updates**: Send investor updates via Resend SMTP
+- 📧 **Email Updates**: Send investor updates via Resend SMTP with optimized BCC bulk sending
 - 👥 **Access Control**: Domain-based and email-based approval system
 - 🎨 **Modern UI**: Built with React, TypeScript, Tailwind CSS, and shadcn/ui
 - 📱 **Responsive**: Works seamlessly on desktop and mobile
@@ -78,7 +78,7 @@ Functions run in `netlify/functions` and use Firebase Admin SDK:
 
 - `check-allowlist`: gate access by email/domain with special handling for generic email providers.
 - `create-user`: syncs user profile and login metadata.
-- `send-investor-update`: creates update + sends emails via Resend SMTP. Includes rate limiting (10 requests/hour per admin) and detailed error handling.
+- `send-investor-update`: creates update + sends emails via Resend SMTP using BCC bulk sending. Includes rate limiting (10 requests/hour per admin) and detailed error handling.
 - `get-allowlist`: fetches all approved domains and emails with user metadata (admin only).
 - `manage-allowlist`: add/remove approved domains and emails (admin only). When adding an email, automatically subscribes the user and sends a welcome email.
 - `seed-db`: seed database with admin user and dummy data.
@@ -105,6 +105,15 @@ Required Netlify env vars (set in Netlify dashboard → Site settings → Enviro
 - `RESEND_REPLY_TO` - Reply-to email address (defaults to `admin@example.com` if not set)
 - `RESEND_SMTP_PORT` - SMTP port (default: `587`). Options: `25`, `465`, `587`, `2465`, `2587`
 - `EMAIL_SUBJECT_PREFIX` - Prefix for investor update email subjects (defaults to `GoAiMEX Update`). Example: `EMAIL_SUBJECT_PREFIX="Company Name Update"` will result in subjects like "Company Name Update: {title}"
+
+**Email Sending Strategy:**
+- **BCC Bulk Sending**: Investor updates use BCC (Blind Carbon Copy) to send batches of 50 recipients per email, reducing API calls significantly
+  - For 100 recipients: 2 API calls instead of 100
+  - For 500 recipients: 10 API calls instead of 500
+  - Each BCC recipient still counts toward your Resend quota (100/day, 3,000/month on free plan)
+  - Rate limiting: 600ms delay between batches (1.67 req/sec) to respect Resend's 2 req/sec limit
+- **Welcome Emails**: Sent individually when admin adds a new email (infrequent, single recipient)
+- **Privacy**: BCC recipients cannot see each other's email addresses
 
 **Seed function variables (optional):**
 - `SEED_SECRET` - Secret key for seed function authentication (defaults to `change-me-in-production`)
@@ -214,6 +223,36 @@ The admin dashboard provides detailed error information:
 - **Failed Recipients**: Expandable list of failed email addresses with error details
 - **Technical Details**: Developer-friendly error details in dev mode
 - **Rate Limit Info**: Shows reset time when rate limit is exceeded
+- **Batch Failures**: If a batch fails during BCC sending, all recipients in that batch are marked as failed with batch-level error information
+
+## Email Sending & Resend Limits
+
+The application uses an optimized email sending strategy to work efficiently with Resend's free plan limits:
+
+### Bulk Updates (BCC Strategy)
+- **Method**: BCC (Blind Carbon Copy) batches of 50 recipients per email
+- **Benefits**:
+  - Reduces API calls from N to N/50 (e.g., 100 recipients = 2 calls instead of 100)
+  - Respects Resend's 2 requests/second rate limit with 600ms delays between batches
+  - Maintains privacy (BCC recipients cannot see each other's addresses)
+- **Quota**: Each BCC recipient still counts toward your daily/monthly quota
+  - Free plan: 100 emails/day, 3,000 emails/month
+  - Each recipient in a BCC batch counts as 1 email toward quota
+- **Error Handling**: If a batch fails, all recipients in that batch are marked as failed
+- **Rate Limiting**: Sequential batch sending with 600ms delay (1.67 req/sec) to stay under 2 req/sec limit
+
+### Welcome Emails
+- **Method**: Individual emails sent when admin adds a new email
+- **Frequency**: Infrequent (only on email addition)
+- **Idempotency**: Includes idempotency keys to prevent duplicate sends
+- **No Conflicts**: Separate from bulk updates, no interference
+
+### Resend Free Plan Considerations
+- **Rate Limit**: 2 requests/second
+- **Daily Quota**: 100 emails/day
+- **Monthly Quota**: 3,000 emails/month
+- **BCC Usage**: BCC recipients count toward quota but reduce API calls
+- **Best Practice**: Monitor your quota usage, especially when sending to large recipient lists
 
 ## Deployment
 

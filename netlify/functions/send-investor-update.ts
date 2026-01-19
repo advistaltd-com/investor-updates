@@ -151,53 +151,78 @@ export const handler: Handler = async (event) => {
     const subjectPrefix = process.env.EMAIL_SUBJECT_PREFIX || "GoAiMEX Update";
     const subject = `${subjectPrefix}: ${title}`;
 
-    // Send emails in chunks to respect rate limits
-    const chunks = chunkArray(recipients, 50);
+    // Email HTML template (extracted for reuse)
+    const emailHtml = `
+      <div style="font-family: Arial, sans-serif; color: #0f172a;">
+        <h2 style="margin-bottom: 8px;">${title}</h2>
+        <p style="margin-top: 0; color: #475569;">${excerpt}</p>
+        <p>
+          <a href="${updateUrl}" style="color: #2563eb; text-decoration: none;">View full update</a>
+        </p>
+        <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b;">
+          <p style="margin: 0;">
+            If you do not wish to receive these updates, please email us at 
+            <a href="mailto:${resendReplyTo}" style="color: #2563eb; text-decoration: none;">${resendReplyTo}</a>
+          </p>
+        </div>
+      </div>
+    `;
+    const emailText = `${title}\n\n${excerpt}\n\nView full update: ${updateUrl}\n\nIf you do not wish to receive these updates, please email us at ${resendReplyTo}`;
+
+    // Send emails using BCC to reduce API calls (Resend free plan: 2 req/sec rate limit)
+    // Each BCC recipient still counts toward quota, but we make fewer API calls
+    // Batch size: 50-100 recipients per email to balance efficiency and reliability
+    const batchSize = 50;
+    const chunks = chunkArray(recipients, batchSize);
     let sentCount = 0;
     let failedCount = 0;
     const failedRecipients: Array<{ email: string; error: string }> = [];
 
-    for (const chunk of chunks) {
-      const emailPromises = chunk.map(async (recipient) => {
-        // Generate idempotency key to prevent duplicate emails
-        const idempotencyKey = `update-${updateRef.id}-${recipient}`;
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      
+      // First recipient goes to "to" field (required by SMTP)
+      // Remaining recipients go to BCC
+      const toRecipient = chunk[0];
+      const bccRecipients = chunk.slice(1);
 
-        try {
-          await transporter.sendMail({
-            from: resendFrom,
-            to: recipient,
-            replyTo: resendReplyTo,
-            subject,
-            html: `
-              <div style="font-family: Arial, sans-serif; color: #0f172a;">
-                <h2 style="margin-bottom: 8px;">${title}</h2>
-                <p style="margin-top: 0; color: #475569;">${excerpt}</p>
-                <p>
-                  <a href="${updateUrl}" style="color: #2563eb; text-decoration: none;">View full update</a>
-                </p>
-                <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b;">
-                  <p style="margin: 0;">
-                    If you do not wish to receive these updates, please email us at 
-                    <a href="mailto:${resendReplyTo}" style="color: #2563eb; text-decoration: none;">${resendReplyTo}</a>
-                  </p>
-                </div>
-              </div>
-            `,
-            text: `${title}\n\n${excerpt}\n\nView full update: ${updateUrl}\n\nIf you do not wish to receive these updates, please email us at ${resendReplyTo}`,
-            headers: {
-              "Resend-Idempotency-Key": idempotencyKey,
-            },
-          });
-          sentCount++;
-        } catch (error) {
+      try {
+        // Generate idempotency key for the batch
+        const idempotencyKey = `update-${updateRef.id}-batch-${i}`;
+
+        await transporter.sendMail({
+          from: resendFrom,
+          to: toRecipient,
+          bcc: bccRecipients.length > 0 ? bccRecipients : undefined,
+          replyTo: resendReplyTo,
+          subject,
+          html: emailHtml,
+          text: emailText,
+          headers: {
+            "Resend-Idempotency-Key": idempotencyKey,
+          },
+        });
+
+        // All recipients in this batch succeeded
+        sentCount += chunk.length;
+      } catch (error) {
+        // If batch fails, all recipients in the batch are marked as failed
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        chunk.forEach((recipient) => {
           failedCount++;
-          const errorMessage = error instanceof Error ? error.message : "Unknown error";
-          failedRecipients.push({ email: recipient, error: errorMessage });
-          console.error(`Failed to send email to ${recipient}:`, errorMessage);
-        }
-      });
+          failedRecipients.push({ 
+            email: recipient, 
+            error: `Batch failed: ${errorMessage}` 
+          });
+        });
+        console.error(`Failed to send batch ${i + 1}/${chunks.length}:`, errorMessage);
+      }
 
-      await Promise.all(emailPromises);
+      // Rate limiting: Wait 600ms between batches to respect Resend's 2 req/sec limit
+      // 600ms = 1.67 req/sec, leaving buffer for other operations
+      if (i < chunks.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 600));
+      }
     }
 
     // Update document with send status

@@ -46,6 +46,9 @@ const sendWelcomeEmail = async (recipientEmail: string) => {
       to: recipientEmail,
       replyTo: resendReplyTo,
       subject,
+      headers: {
+        "Resend-Idempotency-Key": `welcome-${recipientEmail.toLowerCase()}`,
+      },
       html: `
         <div style="font-family: Arial, sans-serif; color: #0f172a;">
           <h2 style="margin-bottom: 16px;">Welcome to GoAiMEX Investor Updates</h2>
