@@ -106,50 +106,68 @@ const seedDatabase = async () => {
 
   console.log(`\n🌱 Seeding database with admin email: ${adminEmail}\n`);
 
-  // Dummy data for testing
-  const dummyEmails = [
-    "investor1@example.com",
-    "investor2@example.com",
-    "partner@test.com",
-  ];
-
-  const dummyDomains = [
-    "example.com",
-    "test.com",
-    "demo.org",
-  ];
+  // Dummy data for testing - organized by domain
+  const dummyData = {
+    "example.com": ["investor1@example.com", "investor2@example.com"],
+    "test.com": ["partner@test.com"],
+    "demo.org": [],
+  };
 
   try {
-    // 1. Add to approved_emails collection (check for duplicates first)
-    console.log("📧 Checking approved_emails collection...");
-    const existingApprovedEmail = await db
-      .collection("approved_emails")
-      .where("email", "==", adminEmail)
-      .limit(1)
-      .get();
+    // 1. Add admin email to its domain's emails array
+    console.log("📧 Adding admin email to approved domains...");
+    const adminDomain = adminEmail.split("@")[1];
+    if (adminDomain) {
+      const domainRef = db.collection("approved_domains").doc(adminDomain);
+      const domainDoc = await domainRef.get();
 
-    if (!existingApprovedEmail.empty) {
-      console.log(`   ⚠️  Approved email already exists for ${adminEmail} (skipping)`);
-    } else {
-      const approvedEmailRef = db.collection("approved_emails").doc();
-      await approvedEmailRef.set({ email: adminEmail });
-      console.log(`   ✅ Added approved email (ID: ${approvedEmailRef.id})`);
+      if (domainDoc.exists) {
+        const domainData = domainDoc.data();
+        const emails = domainData?.emails || [];
+        if (!emails.includes(adminEmail)) {
+          await domainRef.update({
+            emails: [...emails, adminEmail],
+          });
+          console.log(`   ✅ Added admin email to existing domain ${adminDomain}`);
+        } else {
+          console.log(`   ⚠️  Admin email already exists in domain ${adminDomain} (skipping)`);
+        }
+      } else {
+        await domainRef.set({
+          domain: adminDomain,
+          emails: [adminEmail],
+        });
+        console.log(`   ✅ Created domain ${adminDomain} with admin email`);
+      }
     }
 
-    // Add dummy emails
-    console.log("📧 Adding dummy approved emails...");
-    for (const email of dummyEmails) {
-      const existing = await db
-        .collection("approved_emails")
-        .where("email", "==", email)
-        .limit(1)
-        .get();
+    // Add dummy domains with emails
+    console.log("🌐 Adding dummy domains with emails...");
+    for (const [domain, emails] of Object.entries(dummyData)) {
+      const domainRef = db.collection("approved_domains").doc(domain);
+      const domainDoc = await domainRef.get();
 
-      if (existing.empty) {
-        await db.collection("approved_emails").add({ email });
-        console.log(`   ✅ Added dummy email: ${email}`);
+      if (domainDoc.exists) {
+        // Update existing domain with new emails
+        const existingData = domainDoc.data();
+        const existingEmails = existingData?.emails || [];
+        const newEmails = emails.filter((e) => !existingEmails.includes(e));
+        
+        if (newEmails.length > 0) {
+          await domainRef.update({
+            emails: [...existingEmails, ...newEmails],
+          });
+          console.log(`   ✅ Updated domain ${domain} with ${newEmails.length} new emails`);
+        } else {
+          console.log(`   ⚠️  Domain ${domain} already exists with all emails (skipping)`);
+        }
       } else {
-        console.log(`   ⚠️  Email already exists: ${email} (skipping)`);
+        // Create new domain document
+        await domainRef.set({
+          domain,
+          emails,
+        });
+        console.log(`   ✅ Added domain ${domain} with ${emails.length} emails`);
       }
     }
 
@@ -165,22 +183,6 @@ const seedDatabase = async () => {
       console.log(`   ✅ Added admin (ID: ${adminRef.id})`);
     }
 
-    // 3. Add dummy domains
-    console.log("🌐 Adding dummy approved domains...");
-    for (const domain of dummyDomains) {
-      const existing = await db
-        .collection("approved_domains")
-        .where("domain", "==", domain)
-        .limit(1)
-        .get();
-
-      if (existing.empty) {
-        await db.collection("approved_domains").add({ domain });
-        console.log(`   ✅ Added dummy domain: ${domain}`);
-      } else {
-        console.log(`   ⚠️  Domain already exists: ${domain} (skipping)`);
-      }
-    }
 
     console.log(`\n✨ Database seeded successfully! (idempotent - safe to run multiple times)\n`);
     console.log(`Next steps:`);

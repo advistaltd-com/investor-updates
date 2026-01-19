@@ -47,37 +47,38 @@ export const handler: Handler = async (event) => {
     }
     const adminEmail = adminEmailRaw.toLowerCase();
     
-    // Dummy data for testing
-    const dummyEmails = [
-      "investor1@example.com",
-      "investor2@example.com",
-      "partner@test.com",
-    ];
-
-    const dummyDomains = [
-      "example.com",
-      "test.com",
-      "demo.org",
-    ];
+    // Dummy data for testing - organized by domain
+    const dummyData = {
+      "example.com": ["investor1@example.com", "investor2@example.com"],
+      "test.com": ["partner@test.com"],
+      "demo.org": [],
+    };
     
     console.log("Starting seed for admin email:", adminEmail);
     
-    // 1. Add to approved_emails collection (check for duplicates first)
-    const existingApprovedEmail = await adminDb
-      .collection("approved_emails")
-      .where("email", "==", adminEmail)
-      .limit(1)
-      .get();
-    
-    let approvedEmailId: string;
+    // 1. Add admin email to its domain's emails array
+    const adminDomain = adminEmail.split("@")[1];
     let approvedEmailWasNew = false;
-    if (!existingApprovedEmail.empty) {
-      approvedEmailId = existingApprovedEmail.docs[0].id;
-    } else {
-      const approvedEmailRef = adminDb.collection("approved_emails").doc();
-      await approvedEmailRef.set({ email: adminEmail });
-      approvedEmailId = approvedEmailRef.id;
-      approvedEmailWasNew = true;
+    if (adminDomain) {
+      const domainRef = adminDb.collection("approved_domains").doc(adminDomain);
+      const domainDoc = await domainRef.get();
+
+      if (domainDoc.exists) {
+        const domainData = domainDoc.data();
+        const emails = domainData?.emails || [];
+        if (!emails.includes(adminEmail)) {
+          await domainRef.update({
+            emails: [...emails, adminEmail],
+          });
+          approvedEmailWasNew = true;
+        }
+      } else {
+        await domainRef.set({
+          domain: adminDomain,
+          emails: [adminEmail],
+        });
+        approvedEmailWasNew = true;
+      }
     }
     
     // 2. Add to admins collection (document ID = email, so duplicates are prevented)
@@ -92,33 +93,33 @@ export const handler: Handler = async (event) => {
       console.log("Admin document already exists for:", adminEmail);
     }
 
-    // Add dummy emails
-    let addedEmails = 0;
-    for (const email of dummyEmails) {
-      const existing = await adminDb
-        .collection("approved_emails")
-        .where("email", "==", email)
-        .limit(1)
-        .get();
-
-      if (existing.empty) {
-        await adminDb.collection("approved_emails").add({ email });
-        addedEmails++;
-      }
-    }
-
-    // Add dummy domains
+    // Add dummy domains with emails
     let addedDomains = 0;
-    for (const domain of dummyDomains) {
-      const existing = await adminDb
-        .collection("approved_domains")
-        .where("domain", "==", domain)
-        .limit(1)
-        .get();
+    let addedEmails = 0;
+    for (const [domain, emails] of Object.entries(dummyData)) {
+      const domainRef = adminDb.collection("approved_domains").doc(domain);
+      const domainDoc = await domainRef.get();
 
-      if (existing.empty) {
-        await adminDb.collection("approved_domains").add({ domain });
+      if (domainDoc.exists) {
+        // Update existing domain with new emails
+        const existingData = domainDoc.data();
+        const existingEmails = existingData?.emails || [];
+        const newEmails = emails.filter((e) => !existingEmails.includes(e));
+        
+        if (newEmails.length > 0) {
+          await domainRef.update({
+            emails: [...existingEmails, ...newEmails],
+          });
+          addedEmails += newEmails.length;
+        }
+      } else {
+        // Create new domain document
+        await domainRef.set({
+          domain,
+          emails,
+        });
         addedDomains++;
+        addedEmails += emails.length;
       }
     }
     
@@ -128,9 +129,8 @@ export const handler: Handler = async (event) => {
       message: "Database seeded successfully (idempotent - duplicates skipped)",
       data: {
         adminEmail,
-        approvedEmailId,
         adminDocId: adminRef.id,
-        approvedEmailExisted: !approvedEmailWasNew,
+        adminEmailAdded: approvedEmailWasNew,
         adminExisted: !adminWasNew,
         dummyEmailsAdded: addedEmails,
         dummyDomainsAdded: addedDomains,

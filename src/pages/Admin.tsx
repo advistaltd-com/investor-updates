@@ -20,14 +20,10 @@ interface UpdateDoc {
   email_sent?: boolean;
 }
 
-interface AllowlistEmail {
-  id: string;
-  email: string;
-}
-
 interface AllowlistDomain {
   id: string;
   domain: string;
+  emails: string[];
 }
 
 const Admin: React.FC = () => {
@@ -45,12 +41,12 @@ const Admin: React.FC = () => {
   const [recentUpdates, setRecentUpdates] = useState<UpdateDoc[]>([]);
   
   // Allowlist management state
-  const [approvedEmails, setApprovedEmails] = useState<AllowlistEmail[]>([]);
   const [approvedDomains, setApprovedDomains] = useState<AllowlistDomain[]>([]);
   const [newEmail, setNewEmail] = useState("");
   const [newDomain, setNewDomain] = useState("");
   const [isLoadingAllowlist, setIsLoadingAllowlist] = useState(false);
   const [allowlistError, setAllowlistError] = useState<string | null>(null);
+  const [expandedDomains, setExpandedDomains] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const updatesQuery = query(collection(db, "timeline_updates"), orderBy("created_at", "desc"), limit(5));
@@ -85,7 +81,6 @@ const Admin: React.FC = () => {
       }
 
       const data = await response.json();
-      setApprovedEmails(data.emails || []);
       setApprovedDomains(data.domains || []);
     } catch (err) {
       setAllowlistError(err instanceof Error ? err.message : "Failed to load allowlist.");
@@ -166,7 +161,7 @@ const Admin: React.FC = () => {
     }
   };
 
-  const handleRemoveEmail = async (id: string, email: string) => {
+  const handleRemoveEmail = async (email: string) => {
     if (!auth.currentUser) return;
 
     if (!confirm(`Remove ${email} from approved emails?`)) return;
@@ -201,7 +196,19 @@ const Admin: React.FC = () => {
     }
   };
 
-  const handleRemoveDomain = async (id: string, domain: string) => {
+  const toggleDomain = (domainId: string) => {
+    setExpandedDomains((prev) => {
+      const next = new Set(prev);
+      if (next.has(domainId)) {
+        next.delete(domainId);
+      } else {
+        next.add(domainId);
+      }
+      return next;
+    });
+  };
+
+  const handleRemoveDomain = async (domain: string) => {
     if (!auth.currentUser) return;
 
     if (!confirm(`Remove ${domain} from approved domains?`)) return;
@@ -372,119 +379,134 @@ const Admin: React.FC = () => {
           </TabsContent>
 
           <TabsContent value="allowlist" className="space-y-6">
-            <div className="grid gap-6 md:grid-cols-2">
-              {/* Approved Emails */}
-              <div className="bg-card border border-border rounded-xl p-6">
-                <h2 className="text-lg font-semibold text-foreground mb-4">Approved Emails</h2>
-                
-                <div className="space-y-3 mb-4">
-                  <div className="flex gap-2">
-                    <Input
-                      type="email"
-                      placeholder="investor@example.com"
-                      value={newEmail}
-                      onChange={(e) => setNewEmail(e.target.value)}
-                      className="bg-secondary/50 border-border"
-                      disabled={isLoadingAllowlist}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          handleAddEmail();
-                        }
-                      }}
-                    />
-                    <Button
-                      onClick={handleAddEmail}
-                      disabled={!newEmail.trim() || isLoadingAllowlist}
-                      size="icon"
-                    >
-                      <Plus className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-
-                {allowlistError && (
-                  <p className="text-destructive text-sm mb-4">{allowlistError}</p>
-                )}
-
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {approvedEmails.length === 0 ? (
-                    <p className="text-muted-foreground text-sm">No approved emails yet.</p>
-                  ) : (
-                    approvedEmails.map((item) => (
-                      <div
-                        key={item.id}
-                        className="flex items-center justify-between p-2 bg-secondary/30 rounded border border-border"
-                      >
-                        <span className="text-sm text-foreground">{item.email}</span>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-destructive hover:text-destructive"
-                          onClick={() => handleRemoveEmail(item.id, item.email)}
-                          disabled={isLoadingAllowlist}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
-                    ))
-                  )}
+            <div className="bg-card border border-border rounded-xl p-6">
+              <h2 className="text-lg font-semibold text-foreground mb-4">Access Control</h2>
+              
+              {/* Add Domain */}
+              <div className="mb-6">
+                <label className="text-sm font-medium text-foreground mb-2 block">Add Domain</label>
+                <div className="flex gap-2">
+                  <Input
+                    type="text"
+                    placeholder="example.com"
+                    value={newDomain}
+                    onChange={(e) => setNewDomain(e.target.value)}
+                    className="bg-secondary/50 border-border"
+                    disabled={isLoadingAllowlist}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAddDomain();
+                      }
+                    }}
+                  />
+                  <Button
+                    onClick={handleAddDomain}
+                    disabled={!newDomain.trim() || isLoadingAllowlist}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Domain
+                  </Button>
                 </div>
               </div>
 
-              {/* Approved Domains */}
-              <div className="bg-card border border-border rounded-xl p-6">
-                <h2 className="text-lg font-semibold text-foreground mb-4">Approved Domains</h2>
-                
-                <div className="space-y-3 mb-4">
-                  <div className="flex gap-2">
-                    <Input
-                      type="text"
-                      placeholder="example.com"
-                      value={newDomain}
-                      onChange={(e) => setNewDomain(e.target.value)}
-                      className="bg-secondary/50 border-border"
-                      disabled={isLoadingAllowlist}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          handleAddDomain();
-                        }
-                      }}
-                    />
-                    <Button
-                      onClick={handleAddDomain}
-                      disabled={!newDomain.trim() || isLoadingAllowlist}
-                      size="icon"
-                    >
-                      <Plus className="w-4 h-4" />
-                    </Button>
-                  </div>
+              {/* Add Email */}
+              <div className="mb-6">
+                <label className="text-sm font-medium text-foreground mb-2 block">Add Email</label>
+                <div className="flex gap-2">
+                  <Input
+                    type="email"
+                    placeholder="investor@example.com"
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                    className="bg-secondary/50 border-border"
+                    disabled={isLoadingAllowlist}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAddEmail();
+                      }
+                    }}
+                  />
+                  <Button
+                    onClick={handleAddEmail}
+                    disabled={!newEmail.trim() || isLoadingAllowlist}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Email
+                  </Button>
                 </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Email will be added to its domain automatically
+                </p>
+              </div>
 
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {approvedDomains.length === 0 ? (
-                    <p className="text-muted-foreground text-sm">No approved domains yet.</p>
-                  ) : (
-                    approvedDomains.map((item) => (
-                      <div
-                        key={item.id}
-                        className="flex items-center justify-between p-2 bg-secondary/30 rounded border border-border"
-                      >
-                        <span className="text-sm text-foreground">{item.domain}</span>
+              {allowlistError && (
+                <p className="text-destructive text-sm mb-4">{allowlistError}</p>
+              )}
+
+              {/* Domains List */}
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {approvedDomains.length === 0 ? (
+                  <p className="text-muted-foreground text-sm">No approved domains yet.</p>
+                ) : (
+                  approvedDomains.map((domain) => (
+                    <div
+                      key={domain.id}
+                      className="border border-border rounded-lg overflow-hidden"
+                    >
+                      <div className="flex items-center justify-between p-3 bg-secondary/30">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => toggleDomain(domain.id)}
+                            className="text-sm font-medium text-foreground hover:text-primary transition-colors"
+                          >
+                            {expandedDomains.has(domain.id) ? "▼" : "▶"} {domain.domain}
+                          </button>
+                          <span className="text-xs text-muted-foreground">
+                            ({domain.emails.length} {domain.emails.length === 1 ? "email" : "emails"})
+                          </span>
+                        </div>
                         <Button
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7 text-destructive hover:text-destructive"
-                          onClick={() => handleRemoveDomain(item.id, item.domain)}
+                          onClick={() => handleRemoveDomain(domain.domain)}
                           disabled={isLoadingAllowlist}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </Button>
                       </div>
-                    ))
-                  )}
-                </div>
+                      {expandedDomains.has(domain.id) && (
+                        <div className="p-3 bg-background border-t border-border">
+                          {domain.emails.length === 0 ? (
+                            <p className="text-xs text-muted-foreground">No emails for this domain</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {domain.emails.map((email) => (
+                                <div
+                                  key={email}
+                                  className="flex items-center justify-between p-2 bg-secondary/20 rounded"
+                                >
+                                  <span className="text-xs text-foreground">{email}</span>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 text-destructive hover:text-destructive"
+                                    onClick={() => handleRemoveEmail(email)}
+                                    disabled={isLoadingAllowlist}
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </TabsContent>

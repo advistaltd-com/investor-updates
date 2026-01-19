@@ -35,24 +35,19 @@ export const handler: Handler = async (event) => {
       return jsonResponse(403, { error: "Admin privileges required." });
     }
 
-    const [emailsSnap, domainsSnap] = await Promise.all([
-      adminDb.collection("approved_emails").get(),
-      adminDb.collection("approved_domains").get(),
-    ]);
+    const domainsSnap = await adminDb.collection("approved_domains").get();
 
-    const emails = emailsSnap.docs.map((doc) => ({
-      id: doc.id,
-      email: doc.data().email,
-    }));
-
-    const domains = domainsSnap.docs.map((doc) => ({
-      id: doc.id,
-      domain: doc.data().domain,
-    }));
+    const domains = domainsSnap.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id, // domain name
+        domain: data.domain || doc.id,
+        emails: data.emails || [],
+      };
+    });
 
     return jsonResponse(200, {
       success: true,
-      emails,
       domains,
     });
   } catch (err) {

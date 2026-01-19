@@ -48,33 +48,50 @@ export const handler: Handler = async (event) => {
         return jsonResponse(400, { error: "Invalid email format." });
       }
 
-      if (event.httpMethod === "DELETE") {
-        // Delete email
-        const emailSnap = await adminDb
-          .collection("approved_emails")
-          .where("email", "==", value)
-          .limit(1)
-          .get();
+      const emailDomain = value.split("@")[1];
+      if (!emailDomain) {
+        return jsonResponse(400, { error: "Invalid email format." });
+      }
 
-        if (emailSnap.empty) {
-          return jsonResponse(404, { error: "Email not found." });
+      if (event.httpMethod === "DELETE") {
+        // Remove email from domain's emails array
+        const domainRef = adminDb.collection("approved_domains").doc(emailDomain);
+        const domainDoc = await domainRef.get();
+
+        if (!domainDoc.exists) {
+          return jsonResponse(404, { error: "Domain not found." });
         }
 
-        await emailSnap.docs[0].ref.delete();
+        const domainData = domainDoc.data();
+        const emails = (domainData?.emails || []).filter((e: string) => e !== value);
+
+        await domainRef.update({ emails });
         return jsonResponse(200, { success: true, message: "Email removed." });
       } else {
-        // Add email
-        const existing = await adminDb
-          .collection("approved_emails")
-          .where("email", "==", value)
-          .limit(1)
-          .get();
+        // Add email to domain's emails array (or create domain if it doesn't exist)
+        const domainRef = adminDb.collection("approved_domains").doc(emailDomain);
+        const domainDoc = await domainRef.get();
 
-        if (!existing.empty) {
-          return jsonResponse(409, { error: "Email already exists." });
+        if (!domainDoc.exists) {
+          // Create new domain document with this email
+          await domainRef.set({
+            domain: emailDomain,
+            emails: [value],
+          });
+        } else {
+          // Add email to existing domain's emails array
+          const domainData = domainDoc.data();
+          const emails = domainData?.emails || [];
+
+          if (emails.includes(value)) {
+            return jsonResponse(409, { error: "Email already exists." });
+          }
+
+          await domainRef.update({
+            emails: [...emails, value],
+          });
         }
 
-        await adminDb.collection("approved_emails").add({ email: value });
         return jsonResponse(200, { success: true, message: "Email added." });
       }
     } else if (type === "domain") {
@@ -83,32 +100,30 @@ export const handler: Handler = async (event) => {
       }
 
       if (event.httpMethod === "DELETE") {
-        // Delete domain
-        const domainSnap = await adminDb
-          .collection("approved_domains")
-          .where("domain", "==", value)
-          .limit(1)
-          .get();
+        // Delete domain document
+        const domainRef = adminDb.collection("approved_domains").doc(value);
+        const domainDoc = await domainRef.get();
 
-        if (domainSnap.empty) {
+        if (!domainDoc.exists) {
           return jsonResponse(404, { error: "Domain not found." });
         }
 
-        await domainSnap.docs[0].ref.delete();
+        await domainRef.delete();
         return jsonResponse(200, { success: true, message: "Domain removed." });
       } else {
-        // Add domain
-        const existing = await adminDb
-          .collection("approved_domains")
-          .where("domain", "==", value)
-          .limit(1)
-          .get();
+        // Create domain document (or update if exists)
+        const domainRef = adminDb.collection("approved_domains").doc(value);
+        const domainDoc = await domainRef.get();
 
-        if (!existing.empty) {
+        if (domainDoc.exists) {
           return jsonResponse(409, { error: "Domain already exists." });
         }
 
-        await adminDb.collection("approved_domains").add({ domain: value });
+        await domainRef.set({
+          domain: value,
+          emails: [],
+        });
+
         return jsonResponse(200, { success: true, message: "Domain added." });
       }
     } else {

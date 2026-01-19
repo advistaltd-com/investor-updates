@@ -4,21 +4,28 @@ import { jsonResponse } from "./lib/response";
 
 const isApproved = async (email: string) => {
   const domain = email.split("@")[1] || "";
-  const emailSnap = await adminDb
-    .collection("approved_emails")
-    .where("email", "==", email)
-    .limit(1)
-    .get();
+  
+  // Check if domain document exists (domain as document ID)
+  const domainDoc = await adminDb.collection("approved_domains").doc(domain).get();
+  
+  if (!domainDoc.exists) {
+    return false;
+  }
 
-  if (!emailSnap.empty) return true;
+  const domainData = domainDoc.data();
+  if (!domainData) {
+    return false;
+  }
 
-  const domainSnap = await adminDb
-    .collection("approved_domains")
-    .where("domain", "==", domain)
-    .limit(1)
-    .get();
+  // Check if email is in the domain's emails array
+  const emails = domainData.emails || [];
+  if (emails.includes(email)) {
+    return true;
+  }
 
-  return !domainSnap.empty;
+  // If domain exists but email not in array, check if domain allows all emails
+  // (for backward compatibility, if emails array is empty, allow all emails from that domain)
+  return emails.length === 0;
 };
 
 export const handler: Handler = async (event) => {
