@@ -18,8 +18,8 @@ interface TimelineDoc {
 
 const Investor: React.FC = () => {
   useSEO({
-    title: "Investor Updates | GoAiMEX Investor Portal",
-    description: "View the latest investor updates, milestones, and key developments from GoAiMEX.",
+    title: "Investor Updates | Investor Portal",
+    description: "View the latest investor updates, milestones, and key developments.",
     noindex: true,
   });
 
@@ -90,7 +90,7 @@ const Investor: React.FC = () => {
         ) : (
           <Timeline
             data={timelineData}
-            heading="GoAiMEX Investor Updates"
+            heading="Investor Updates"
             subheading="Track our journey, milestones, and key developments"
           />
         )}

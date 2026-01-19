@@ -246,7 +246,7 @@ export const RequestAccessModal: React.FC<RequestAccessModalProps> = ({
                     </label>
                     <Textarea
                       name="note"
-                      placeholder="Tell us about your interest in GoAiMEX..."
+                      placeholder="Tell us about your interest..."
                       value={formData.note}
                       onChange={(e) => handleChange("note", e.target.value)}
                       className="bg-secondary/50 border-border resize-none"

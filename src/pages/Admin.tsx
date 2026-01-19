@@ -28,7 +28,7 @@ interface AllowlistDomain {
 
 const Admin: React.FC = () => {
   useSEO({
-    title: "Admin Dashboard | GoAiMEX Investor Portal",
+    title: "Admin Dashboard | Investor Portal",
     description: "Admin dashboard for managing and publishing investor updates.",
     noindex: true,
   });

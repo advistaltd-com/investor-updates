@@ -4,7 +4,7 @@ import { useSEO } from "@/hooks/use-seo";
 
 const NotFound = () => {
   useSEO({
-    title: "404 - Page Not Found | GoAiMEX Investor Portal",
+    title: "404 - Page Not Found | Investor Portal",
     description: "The page you are looking for does not exist.",
     noindex: true,
   });

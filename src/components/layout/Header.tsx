@@ -25,7 +25,7 @@ export const Header: React.FC = () => {
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
               <span className="text-primary-foreground font-bold text-sm">G</span>
             </div>
-            <span className="font-semibold text-foreground">GoAiMEX</span>
+            <span className="font-semibold text-foreground">Investor Portal</span>
             <span className="text-muted-foreground text-sm hidden sm:inline">Investor Portal</span>
           </div>
 

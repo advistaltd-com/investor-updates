@@ -109,7 +109,7 @@ export const handler: Handler = async (event) => {
     const siteUrl = process.env.URL || process.env.DEPLOY_PRIME_URL || "http://localhost:8888";
     const updateUrl = `${siteUrl}/investor?update=${updateRef.id}`;
     const excerpt = stripMarkdown(contentMd).slice(0, 240);
-    const subject = `GoAiMEX Update: ${title}`;
+    const subject = `Investor Update: ${title}`;
 
     // Send emails in chunks to respect rate limits
     const chunks = chunkArray(recipients, 50);

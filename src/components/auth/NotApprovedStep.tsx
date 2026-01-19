@@ -60,8 +60,8 @@ export const NotApprovedStep: React.FC = () => {
 
           <p className="text-center text-xs text-muted-foreground">
             Already an investor? Contact us at{" "}
-            <a href="mailto:investors@goaimex.com" className="text-primary hover:underline">
-              investors@goaimex.com
+            <a href="mailto:investors@example.com" className="text-primary hover:underline">
+              investors@example.com
             </a>
           </p>
         </div>

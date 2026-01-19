@@ -12,8 +12,8 @@ import { useSEO } from "@/hooks/use-seo";
 
 const Auth: React.FC = () => {
   useSEO({
-    title: "Sign In | GoAiMEX Investor Portal",
-    description: "Sign in to access your GoAiMEX investor portal account.",
+    title: "Sign In | Investor Portal",
+    description: "Sign in to access your investor portal account.",
     noindex: true,
   });
 
@@ -62,7 +62,7 @@ const Auth: React.FC = () => {
         {/* Footer */}
         <div className="fixed bottom-4 text-center">
           <p className="text-muted-foreground text-xs">
-            © 2026 GoAiMEX. All rights reserved.
+            © 2026 Investor Portal. All rights reserved.
           </p>
         </div>
       </div>
@@ -81,7 +81,7 @@ const Auth: React.FC = () => {
       {/* Footer */}
       <div className="fixed bottom-4 text-center">
         <p className="text-muted-foreground text-xs">
-          © 2026 GoAiMEX. All rights reserved.
+          © 2026 Investor Portal. All rights reserved.
         </p>
       </div>
     </div>

@@ -1,6 +1,15 @@
-# GoAiMEX Investor Portal
+# Investor Portal
 
-Private, authenticated investor portal powered by Firebase Auth + Firestore and Netlify Functions.
+Open-source, authenticated investor portal powered by Firebase Auth + Firestore and Netlify Functions. Perfect for startups and companies to share private updates with investors.
+
+## Features
+
+- 🔐 **Secure Authentication**: Email link (passwordless) signup with password setup
+- 📧 **Email Updates**: Send investor updates via Resend SMTP
+- 👥 **Access Control**: Domain-based and email-based approval system
+- 🎨 **Modern UI**: Built with React, TypeScript, Tailwind CSS, and shadcn/ui
+- 📱 **Responsive**: Works seamlessly on desktop and mobile
+- 🔒 **Admin Dashboard**: Manage approved emails/domains and publish updates
 
 ## Folder structure
 
@@ -8,21 +17,29 @@ Private, authenticated investor portal powered by Firebase Auth + Firestore and 
   - `check-allowlist.ts` - validates approved email/domain
   - `create-user.ts` - syncs user profile after auth
   - `send-investor-update.ts` - sends update emails via Resend SMTP
+  - `get-allowlist.ts` - fetches approved emails/domains (admin only)
+  - `manage-allowlist.ts` - manages approved emails/domains (admin only)
+  - `seed-db.ts` - database seeding function
   - `unsubscribe.ts` - unsubscribe handler (legacy, no longer used in emails)
 - `src`
   - `components/auth` - gated auth flow with email link signup
-  - `pages/Admin.tsx` - admin update composer
+  - `pages/Admin.tsx` - admin update composer and access control
   - `pages/Investor.tsx` - timeline updates from Firestore
 - `firestore.rules` - Firestore security rules
+- `scripts/seed-db.ts` - local database seeding script
 
 ## Local setup
 
 1. Install dependencies
-   - `npm install`
+   ```bash
+   npm install
+   ```
+
 2. Create `.env` based on `.env.example`
    - Copy `.env.example` to `.env`
    - Replace all `REPLACE_WITH_*` placeholders with your actual values
    - **Important**: Never commit `.env` files with real secrets to the repository
+
 3. Run locally
    - For frontend only: `npm run dev`
    - For full stack (with Netlify functions): `netlify dev`
@@ -45,10 +62,9 @@ Private, authenticated investor portal powered by Firebase Auth + Firestore and 
 6. Set an admin user:
    - **Easy way (recommended)**: Run the seed script:
      ```bash
-     npm run seed
+     ADMIN_EMAIL=your@email.com npm run seed
      ```
-     This will add `mdil@goaimex.com` to both `approved_emails` and `admins` collections.
-     To use a different email: `ADMIN_EMAIL=your@email.com npm run seed`
+     This will add your email to the `approved_domains` collection (in its domain's emails array) and to the `admins` collection.
    
    - **Manual way**: Create a document in the `admins` collection with the admin's email as the document ID (lowercase).
      - Example: Collection `admins`, Document ID: `admin@example.com`
@@ -63,6 +79,9 @@ Functions run in `netlify/functions` and use Firebase Admin SDK:
 - `check-allowlist`: gate access by email/domain with special handling for generic email providers.
 - `create-user`: syncs user profile and login metadata.
 - `send-investor-update`: creates update + sends emails via Resend SMTP.
+- `get-allowlist`: fetches all approved domains and emails (admin only).
+- `manage-allowlist`: add/remove approved domains and emails (admin only).
+- `seed-db`: seed database with admin user and dummy data.
 - `unsubscribe`: updates `subscribed=false` with signed token (legacy, no longer used in emails).
 
 Required Netlify env vars (set in Netlify dashboard → Site settings → Environment variables):
@@ -83,18 +102,19 @@ Required Netlify env vars (set in Netlify dashboard → Site settings → Enviro
 - `RESEND_FROM` - Email address to send from (must be verified domain)
 
 **Optional email variables:**
-- `RESEND_REPLY_TO` - Reply-to email address (defaults to `mdil@goaimex.com`)
+- `RESEND_REPLY_TO` - Reply-to email address (defaults to `admin@example.com` if not set)
+- `RESEND_SMTP_PORT` - SMTP port (default: `587`). Options: `25`, `465`, `587`, `2465`, `2587`
+
+**Seed function variables (optional):**
+- `SEED_SECRET` - Secret key for seed function authentication (defaults to `change-me-in-production`)
+- `SEED_ADMIN_EMAIL` - Admin email to seed (required when using seed function)
 
 **Frontend environment variables (set in Netlify Build settings):**
-- `VITE_EMAIL_LINK_REDIRECT_URL` - **Required for production!** Set to your production URL (e.g., `https://updates.goaimex.com/auth`). 
+- `VITE_EMAIL_LINK_REDIRECT_URL` - **Required for production!** Set to your production URL (e.g., `https://your-domain.com/auth`). 
   - **Important**: This must be set in Netlify's Build environment variables (not just runtime env vars) because Vite needs it at build time.
   - Without this, email links will redirect to localhost or the wrong URL.
   - Go to: Netlify Dashboard → Site settings → Build & deploy → Environment → Add variable
   - **Note**: After setting this, you must redeploy for it to take effect. Existing email links sent before the fix will still redirect to the old URL - users will need to request a new link.
-
-Optional Netlify env vars:
-
-- `RESEND_SMTP_PORT` - SMTP port (default: `587`). Options: `25`, `465`, `587`, `2465`, `2587`
 
 **Security Note**: Never commit real secret values to the repository. The `.env.example` file contains only placeholders. Set actual values in Netlify's environment variables dashboard.
 
@@ -112,17 +132,13 @@ Optional Netlify env vars:
 To quickly set up the initial admin user, use the seed script:
 
 ```bash
-npm run seed
+ADMIN_EMAIL=your@email.com npm run seed
 ```
 
 This will:
 - Add the email in `ADMIN_EMAIL` to the `approved_domains` collection (in its domain's emails array)
 - Add the email in `ADMIN_EMAIL` to the `admins` collection
-
-Set the admin email (required):
-```bash
-ADMIN_EMAIL=your@email.com npm run seed
-```
+- Add dummy test data (example.com, test.com domains with sample emails)
 
 **Requirements:**
 - Your `.env` file must have Firebase credentials configured (see Firebase setup above)
@@ -159,9 +175,19 @@ The modal uses a Netlify Form named `request-access` with fields:
 - `timeline_updates` - Investor update posts
 - `admins` - Admin users (document ID = email address, lowercase)
 
-## Deploy
+## Deployment
 
-1. Push to the `cursor/private-investor-portal-956e` branch.
-2. Connect the repo to Netlify.
-3. Set env vars in Netlify.
-4. Deploy.
+1. Connect your repository to Netlify (or your preferred hosting platform)
+2. Set environment variables in Netlify dashboard (see "Netlify functions" section above)
+3. Configure build settings:
+   - Build command: `npm run build`
+   - Publish directory: `dist`
+4. Deploy
+
+## License
+
+MIT License - see LICENSE file for details
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.

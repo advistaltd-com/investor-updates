@@ -49,7 +49,7 @@ export const useSEO = ({ title, description, keywords, noindex = true }: SEOProp
     return () => {
       // Optionally restore default title
       if (title) {
-        document.title = "GoAiMEX Investor Portal - Private Investor Updates";
+        document.title = "Investor Portal - Private Investor Updates";
       }
     };
   }, [title, description, keywords, noindex]);
