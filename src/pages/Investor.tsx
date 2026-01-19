@@ -3,6 +3,7 @@ import { collection, onSnapshot, orderBy, query, type Timestamp } from "firebase
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { format } from "date-fns";
+import { Loader2 } from "lucide-react";
 import { Timeline, TimelineEntry } from "@/components/ui/timeline";
 import { Header } from "@/components/layout/Header";
 import { db } from "@/lib/firebase";
@@ -24,6 +25,7 @@ const Investor: React.FC = () => {
 
   const [updates, setUpdates] = useState<TimelineDoc[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const updatesQuery = query(collection(db, "timeline_updates"), orderBy("created_at", "desc"));
@@ -35,9 +37,11 @@ const Investor: React.FC = () => {
           ...(doc.data() as Omit<TimelineDoc, "id">),
         }));
         setUpdates(items);
+        setIsLoading(false);
       },
       () => {
         setError("Unable to load updates right now.");
+        setIsLoading(false);
       },
     );
 
@@ -70,7 +74,12 @@ const Investor: React.FC = () => {
     <div className="min-h-screen w-full bg-background">
       <Header />
       <div className="pt-16">
-        {error ? (
+        {isLoading ? (
+          <div className="max-w-3xl mx-auto px-4 md:px-8 lg:px-10 py-16 flex flex-col items-center justify-center gap-4">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <p className="text-muted-foreground text-sm">Loading investor updates...</p>
+          </div>
+        ) : error ? (
           <div className="max-w-3xl mx-auto px-4 md:px-8 lg:px-10 py-16 text-center text-destructive">
             {error}
           </div>

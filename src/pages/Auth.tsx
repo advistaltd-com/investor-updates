@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
+import { Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { EmailStep } from "@/components/auth/EmailStep";
 import { EmailLinkStep } from "@/components/auth/EmailLinkStep";
@@ -16,7 +17,7 @@ const Auth: React.FC = () => {
     noindex: true,
   });
 
-  const { authStep, completeEmailLinkSignIn } = useAuth();
+  const { authStep, completeEmailLinkSignIn, isReady, isLoading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -45,6 +46,28 @@ const Auth: React.FC = () => {
         return <EmailStep />;
     }
   };
+
+  // Show loading spinner while auth is initializing or during login process
+  if (!isReady || isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+        {/* Subtle background gradient */}
+        <div className="fixed inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent pointer-events-none" />
+        
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <p className="text-muted-foreground text-sm">Loading...</p>
+        </div>
+
+        {/* Footer */}
+        <div className="fixed bottom-4 text-center">
+          <p className="text-muted-foreground text-xs">
+            © 2026 GoAiMEX. All rights reserved.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
