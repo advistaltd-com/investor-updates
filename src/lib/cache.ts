@@ -67,6 +67,23 @@ class FetchCache {
     }
   }
 
+  // Delete cache entries by URL pattern (matches URL portion of cache key)
+  deleteByUrlPattern(urlPattern: string): void {
+    const pattern = urlPattern.toLowerCase();
+    const keysToDelete: string[] = [];
+    
+    // Match the URL portion directly inside the full key string.
+    // Key format is METHOD:URL:AUTHKEY:BODY, and URL can include colons.
+    const marker = `:${pattern}:`;
+    for (const key of this.cache.keys()) {
+      if (key.toLowerCase().includes(marker)) {
+        keysToDelete.push(key);
+      }
+    }
+    
+    keysToDelete.forEach((key) => this.cache.delete(key));
+  }
+
   destroy() {
     if (this.cleanupInterval !== null) {
       clearInterval(this.cleanupInterval);
@@ -78,6 +95,40 @@ class FetchCache {
 
 // Singleton instance
 const cache = new FetchCache();
+
+/**
+ * Extract authorization header value for cache key
+ * Handles both Headers objects and plain objects
+ */
+function getAuthKey(headers: HeadersInit | undefined): string {
+  if (!headers) return "";
+  
+  // Handle Headers object
+  if (headers instanceof Headers) {
+    const authHeader = headers.get("authorization") || headers.get("Authorization");
+    if (!authHeader) return "";
+    // Use token fingerprint (first 8 + last 8 chars) to prevent cross-user cache pollution
+    const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+    if (token.length <= 16) return token;
+    return `${token.slice(0, 8)}${token.slice(-8)}`;
+  }
+  
+  // Handle plain object or array
+  if (Array.isArray(headers)) {
+    const authEntry = headers.find(([key]) => key.toLowerCase() === "authorization");
+    if (!authEntry) return "";
+    const token = authEntry[1].replace(/^Bearer\s+/i, "").trim();
+    if (token.length <= 16) return token;
+    return `${token.slice(0, 8)}${token.slice(-8)}`;
+  }
+  
+  // Handle Record<string, string>
+  const authHeader = headers["authorization"] || headers["Authorization"];
+  if (!authHeader) return "";
+  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+  if (token.length <= 16) return token;
+  return `${token.slice(0, 8)}${token.slice(-8)}`;
+}
 
 /**
  * Cached fetch wrapper
@@ -95,9 +146,10 @@ export async function cachedFetch(
     return fetch(url, options);
   }
 
-  // Create cache key from URL and body
+  // Create cache key from method, URL, auth header, and body
   const bodyKey = options.body ? JSON.stringify(options.body) : "";
-  const cacheKey = `${method}:${url}:${bodyKey}`;
+  const authKey = getAuthKey(options.headers);
+  const cacheKey = `${method}:${url}:${authKey}:${bodyKey}`;
 
   // Check cache
   const cached = cache.get<{ status: number; statusText: string; body: string; headers: Record<string, string> }>(cacheKey);
@@ -139,6 +191,14 @@ export async function cachedFetch(
  */
 export function invalidateCache(pattern: string | RegExp) {
   cache.invalidate(pattern);
+}
+
+/**
+ * Delete cache entries by URL pattern (matches URL portion of cache key)
+ * Useful for clearing all cache entries for a specific endpoint
+ */
+export function deleteByUrlPattern(urlPattern: string) {
+  cache.deleteByUrlPattern(urlPattern);
 }
 
 /**

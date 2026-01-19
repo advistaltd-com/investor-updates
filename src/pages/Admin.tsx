@@ -5,7 +5,7 @@ import remarkGfm from "remark-gfm";
 import { X, Plus, Trash2 } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import { getFunctionUrl } from "@/lib/functions";
-import { cachedFetch, invalidateCache } from "@/lib/cache";
+import { cachedFetch, deleteByUrlPattern } from "@/lib/cache";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -141,7 +141,10 @@ const Admin: React.FC = () => {
       }
 
       setNewEmail("");
-      invalidateCache("get-allowlist");
+      // Clear cached approval checks - newly approved users should see access immediately
+      deleteByUrlPattern("check-allowlist");
+      // Clear cached allowlist data to show updated list
+      deleteByUrlPattern("get-allowlist");
       await loadAllowlist();
     } catch (err) {
       setAllowlistError(err instanceof Error ? err.message : "Failed to add email.");
@@ -176,7 +179,10 @@ const Admin: React.FC = () => {
       }
 
       setNewDomain("");
-      invalidateCache("get-allowlist");
+      // Clear cached approval checks - newly approved users should see access immediately
+      deleteByUrlPattern("check-allowlist");
+      // Clear cached allowlist data to show updated list
+      deleteByUrlPattern("get-allowlist");
       await loadAllowlist();
     } catch (err) {
       setAllowlistError(err instanceof Error ? err.message : "Failed to add domain.");
@@ -212,7 +218,10 @@ const Admin: React.FC = () => {
         throw new Error(errorData.error || "Failed to remove email.");
       }
 
-      invalidateCache("get-allowlist");
+      // Clear cached approval checks - removed users should lose access immediately
+      deleteByUrlPattern("check-allowlist");
+      // Clear cached allowlist data to show updated list
+      deleteByUrlPattern("get-allowlist");
       await loadAllowlist();
     } catch (err) {
       setAllowlistError(err instanceof Error ? err.message : "Failed to remove email.");
@@ -260,7 +269,10 @@ const Admin: React.FC = () => {
         throw new Error(errorData.error || "Failed to remove domain.");
       }
 
-      invalidateCache("get-allowlist");
+      // Clear cached approval checks - removed domains should lose access immediately
+      deleteByUrlPattern("check-allowlist");
+      // Clear cached allowlist data to show updated list
+      deleteByUrlPattern("get-allowlist");
       await loadAllowlist();
     } catch (err) {
       setAllowlistError(err instanceof Error ? err.message : "Failed to remove domain.");
