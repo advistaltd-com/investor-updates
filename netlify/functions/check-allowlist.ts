@@ -23,9 +23,9 @@ const isApproved = async (email: string) => {
     return true;
   }
 
-  // If domain exists but email not in array, check if domain allows all emails
-  // (for backward compatibility, if emails array is empty, allow all emails from that domain)
-  return emails.length === 0;
+  // Empty array means no emails are approved for this domain
+  // Domain document must have at least one email in the array to approve users
+  return false;
 };
 
 export const handler: Handler = async (event) => {

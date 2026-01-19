@@ -10,7 +10,7 @@ const getBearerToken = (authorization?: string) => {
 
 const isAdmin = async (email: string) => {
   const adminDoc = await adminDb.collection("admins").doc(email.toLowerCase()).get();
-  return adminDoc.exists();
+  return adminDoc.exists;
 };
 
 export const handler: Handler = async (event) => {
@@ -64,6 +64,13 @@ export const handler: Handler = async (event) => {
 
         const domainData = domainDoc.data();
         const emails = (domainData?.emails || []).filter((e: string) => e !== value);
+
+        // If no emails remain, delete the domain document to prevent security issue
+        // (empty array would mean no approvals, but deleting is cleaner)
+        if (emails.length === 0) {
+          await domainRef.delete();
+          return jsonResponse(200, { success: true, message: "Email removed. Domain deleted as it had no remaining emails." });
+        }
 
         await domainRef.update({ emails });
         return jsonResponse(200, { success: true, message: "Email removed." });

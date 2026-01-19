@@ -35,7 +35,7 @@ const signUnsubscribeToken = (email: string, secret: string) => {
 
 const isAdmin = async (email: string) => {
   const adminDoc = await adminDb.collection("admins").doc(email.toLowerCase()).get();
-  return adminDoc.exists();
+  return adminDoc.exists;
 };
 
 export const handler: Handler = async (event) => {
