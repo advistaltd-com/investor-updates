@@ -17,14 +17,14 @@ const Auth: React.FC = () => {
     noindex: true,
   });
 
-  const { authStep, completeEmailLinkSignIn, isReady, isLoading } = useAuth();
+  const { authStep, completeEmailLinkSignIn, isReady, isLoading, needsPasswordSetup } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (authStep === "authenticated") {
+    if (authStep === "authenticated" && !needsPasswordSetup) {
       navigate("/investor", { replace: true });
     }
-  }, [authStep, navigate]);
+  }, [authStep, needsPasswordSetup, navigate]);
 
   useEffect(() => {
     completeEmailLinkSignIn();

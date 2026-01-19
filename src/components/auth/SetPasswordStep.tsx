@@ -8,9 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 export const SetPasswordStep: React.FC = () => {
   const { setAuthStep, setPassword, setError, error, isLoading, setIsLoading } = useAuth();
   const [password, setPasswordValue] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const requirements = [
     { label: "At least 8 characters", met: password.length >= 8 },
@@ -19,12 +17,11 @@ export const SetPasswordStep: React.FC = () => {
   ];
 
   const allRequirementsMet = requirements.every(r => r.met);
-  const passwordsMatch = password === confirmPassword && confirmPassword.length > 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!allRequirementsMet || !passwordsMatch) return;
+    if (!allRequirementsMet) return;
 
     setIsLoading(true);
     setError(null);
@@ -85,23 +82,6 @@ export const SetPasswordStep: React.FC = () => {
             </button>
           </div>
 
-          <div className="relative">
-            <Input
-              type={showConfirmPassword ? "text" : "password"}
-              placeholder="Confirm password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="h-12 bg-secondary/50 border-border focus:border-primary focus:ring-primary pr-10"
-              disabled={isLoading}
-            />
-            <button
-              type="button"
-              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-            >
-              {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </button>
-          </div>
         </div>
 
         <div className="space-y-2 py-2">
@@ -117,16 +97,6 @@ export const SetPasswordStep: React.FC = () => {
               </span>
             </div>
           ))}
-          <div className="flex items-center gap-2 text-sm">
-            {passwordsMatch ? (
-              <Check className="w-4 h-4 text-green-500" />
-            ) : (
-              <X className="w-4 h-4 text-muted-foreground" />
-            )}
-            <span className={passwordsMatch ? "text-foreground" : "text-muted-foreground"}>
-              Passwords match
-            </span>
-          </div>
         </div>
 
         {error && (
@@ -136,7 +106,7 @@ export const SetPasswordStep: React.FC = () => {
         <Button
           type="submit"
           className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-medium"
-          disabled={isLoading || !allRequirementsMet || !passwordsMatch}
+          disabled={isLoading || !allRequirementsMet}
         >
           {isLoading ? (
             <Loader2 className="w-5 h-5 animate-spin" />

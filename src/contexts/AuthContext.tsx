@@ -4,6 +4,7 @@ import {
   sendSignInLinkToEmail,
   signInWithEmailAndPassword,
   signInWithEmailLink,
+  getAdditionalUserInfo,
   onAuthStateChanged,
   updatePassword,
   sendPasswordResetEmail,
@@ -31,6 +32,7 @@ interface AuthContextType {
   user: User | null;
   firebaseUser: FirebaseUser | null;
   isAdmin: boolean;
+  needsPasswordSetup: boolean;
   authStep: AuthStep;
   email: string;
   isLoading: boolean;
@@ -132,6 +134,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw err;
       }
     },
+    [],
   );
 
   const sendEmailLink = useCallback(async (emailToSend: string): Promise<boolean> => {
@@ -185,7 +188,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       await syncUserRecord();
 
-      const isNewUser = Boolean(result.additionalUserInfo?.isNewUser);
+      const isNewUser = Boolean(getAdditionalUserInfo(result)?.isNewUser);
       setNeedsPasswordSetup(isNewUser);
       setAuthStep(isNewUser ? "set-password" : "authenticated");
       return { handled: true, isNewUser };
@@ -246,6 +249,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       user,
       firebaseUser,
       isAdmin,
+      needsPasswordSetup,
       authStep,
       email,
       isLoading,
@@ -267,6 +271,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       user,
       firebaseUser,
       isAdmin,
+      needsPasswordSetup,
       authStep,
       email,
       isLoading,
