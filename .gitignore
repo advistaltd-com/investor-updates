@@ -32,3 +32,33 @@ dist-ssr
 .env.test
 # Keep .env.example in repo (with placeholders only, no real secrets)
 !.env.example
+
+# Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+
+# Service account files
+service-account.json
+*-service-account.json
+
+# Build outputs
+build/
+dist/
+
+# Cache
+.cache
+.parcel-cache
+.eslintcache
+.stylelintcache
+
+# Testing
+coverage/
+.nyc_output
+
+# TypeScript
+*.tsbuildinfo
+
+# OS
+.DS_Store
+Thumbs.db
